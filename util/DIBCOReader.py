@@ -57,7 +57,7 @@ class DIBCODataset(Dataset):
         Y_train = np.asarray(Y_train).astype('float32')
 
         # invert pixel values
-        X_train = 1 - X_train
+        X_train = 255 - X_train
 
         # normalize target image and invert pixel values
         Y_train /= 255.
@@ -98,6 +98,8 @@ class DIBCODataset(Dataset):
     def __getitem__(self, index):
         img_gr = Image.fromarray(self.X_train[index])
         img_gt = Image.fromarray(self.Y_train[index])
+        # img_gr = self.X_train[index]
+        # img_gt = self.Y_train[index]
         
         seed = np.random.randint(2147483647) # make a seed with numpy generator 
         random.seed(seed) # apply this seed to img tranfsorms
@@ -120,7 +122,7 @@ class DIBCODataset(Dataset):
     #     return (img_gr, img_gt)
 
     def __len__(self):
-        return count # of how many examples(images?) you have
+        return len(self.X_train) # of how many examples(images?) you have
 
 
 if __name__ == '__main__':
@@ -129,4 +131,4 @@ if __name__ == '__main__':
     # Call the dataset
     # custom_dataset = MyCustomDataset(..., transformations)
     data_loader = DIBCODataset(transform=transformations)
-    data_loader.__getitem__(0)
+
