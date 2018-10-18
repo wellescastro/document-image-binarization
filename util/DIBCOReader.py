@@ -18,8 +18,6 @@ class DIBCODataset(Dataset):
     }
 
     def __init__(self, basepath="/home/dayvidwelles/phd/code/computer-vision-project/data/Dibco", years=[2009,2010,2011,2012,2013,2014], transforms=None, windows_size=(256,256)):
-        
-
         data_files = []
         for year in years:
             for subset in self.DIBCO[year]:
@@ -50,7 +48,19 @@ class DIBCODataset(Dataset):
             X_train.extend(img_gr_patches)
             Y_train.extend(img_gt_patches)
 
+        # convert to arrays
+        X_train = np.asarray(X_train).astype('float32')
+        Y_train = np.asarray(Y_train).astype('float32')
 
+        # invert pixel values
+        X_train = 1 - X_train
+
+        # normalize target image and invert pixel values
+        Y_train /= 255.
+        Y_train = 1 - Y_train
+
+        self.X_train = X_train
+        self.Y_train = Y_train
 
     def patchify(self, img, patch_shape):
         img = np.ascontiguousarray(img)  # won't make a copy if not needed
