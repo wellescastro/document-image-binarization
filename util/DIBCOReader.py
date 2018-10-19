@@ -111,7 +111,7 @@ class DIBCODataset(Dataset):
         if self.target_transform is not None:
             img_gt = self.target_transform(img_gt)
 
-        return (img_gr, img_gt)    
+        return (img_gr, img_gt)
 
     # def __getitem__(self, index):
     #     filename_gr = self.data_files[index]
