@@ -9,6 +9,7 @@ import torch.optim as optim
 from torch.autograd import Variable
 from models import losses
 import shutil
+from EarlyStopping import EarlyStopping
 
 def criterion(logits, labels):
     return losses.F1ScoreLoss().forward(logits, labels)
@@ -70,6 +71,8 @@ def main():
           .format(len(train_loader.dataset), len(test_loader.dataset)))
 
     best_training_loss = 99999
+    early_stopper = EarlyStopping(mode='min', patience=20)
+
     for epoch in range(epochs):
         training_loss = 0
         testing_loss = 0
@@ -95,6 +98,9 @@ def main():
 
             training_loss += loss.item()
         
+        # get the average training loss
+        training_loss /= len(train_loader)
+        
         # perform validation 
         net.eval()
         with torch.no_grad():
@@ -113,15 +119,24 @@ def main():
 
                 # get thresholded prediction and compute the f1-score
                 pred = (logits > threshold).float()
+        
+        # get the average validation loss
+        testing_loss /= len(test_loader)
+
+        print('[%d, %d] train loss: %.4f test loss: %.4f current stopping patience: %.4f' %
+                    (epoch + 1, epochs, training_loss, testing_loss, early_stopper.patience))
 
         # remember best training loss and save checkpoint
         is_best = training_loss < best_training_loss
-        best_training_loss = min(best_training_loss, training_loss)
+
+        if early_stopper.step(training_loss) == True:
+            print("Training finished!")
+            break
 
         save_checkpoint({
             'epoch': epoch + 1,
             'state_dict': net.state_dict(),
-            'best_training_loss': best_training_loss,
+            'best_training_loss': early_stopper.best,
             'optimizer' : optimizer.state_dict(),
         }, is_best, model_weiths_path)
 

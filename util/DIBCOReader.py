@@ -113,15 +113,6 @@ class DIBCODataset(Dataset):
 
         return (img_gr, img_gt)
 
-    # def __getitem__(self, index):
-    #     filename_gr = self.data_files[index]
-    #     filename_gt = self.data_files[index].replace("GR", "GT")
-
-    #     img_gr = cv2.imread(filename_gr, cv2.IMREAD_GRAYSCALE)
-    #     img_gt = cv2.imread(filename_gt, cv2.IMREAD_GRAYSCALE)
-
-    #     return (img_gr, img_gt)
-
     def __len__(self):
         return len(self.X_train) # of how many examples(images?) you have
 
@@ -132,4 +123,3 @@ if __name__ == '__main__':
     # Call the dataset
     # custom_dataset = MyCustomDataset(..., transformations)
     data_loader = DIBCODataset(transform=transformations)
-
