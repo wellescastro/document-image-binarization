@@ -1,30 +1,115 @@
 import torch.nn as nn
 
 class AutoEncoder(nn.Module):
-    def __init__(self):
+    def __init__(self, nb_layers):
         super(AutoEncoder, self).__init__()
 
-        self.encoder = nn.Sequential(
-            nn.Linear(28*28, 128),
-            nn.Tanh(),
-            nn.Linear(128, 64),
-            nn.Tanh(),
-            nn.Linear(64, 12),
-            nn.Tanh(),
-            nn.Linear(12, 3),   # compress to 3 features which can be visualized in plt
+        self.kernel_size = 5
+        self.stride = 2
+        self.nb_filters = 64
+
+        # encoder
+        self.conv_block1 = self.conv_block(in_f=1, out_f=self.nb_filters, kernel_size=self.kernel_size, stride=self.stride, padding=2)
+        
+        self.conv_block2 = nn.Sequential(
+            nn.Conv2d(in_channels=self.nb_filters, out_channels=self.nb_filters, kernel_size=self.kernel_size, stride=self.stride, padding=2),
+            nn.BatchNorm2d(self.nb_filters),
+            nn.ReLU(inplace=True)
         )
-        self.decoder = nn.Sequential(
-            nn.Linear(3, 12),
-            nn.Tanh(),
-            nn.Linear(12, 64),
-            nn.Tanh(),
-            nn.Linear(64, 128),
-            nn.Tanh(),
-            nn.Linear(128, 28*28),
-            nn.Sigmoid(),       # compress to a range (0, 1)
+
+        self.conv_block3 = nn.Sequential(
+            nn.Conv2d(in_channels=self.nb_filters, out_channels=self.nb_filters, kernel_size=self.kernel_size, stride=self.stride, padding=2),
+            nn.BatchNorm2d(self.nb_filters),
+            nn.ReLU(inplace=True)
+        )
+
+        self.conv_block4 = nn.Sequential(
+            nn.Conv2d(in_channels=self.nb_filters, out_channels=self.nb_filters, kernel_size=self.kernel_size, stride=self.stride, padding=2),
+            nn.BatchNorm2d(self.nb_filters),
+            nn.ReLU(inplace=True)
+        )
+
+        self.conv_block5 = nn.Sequential(
+            nn.Conv2d(in_channels=self.nb_filters, out_channels=self.nb_filters, kernel_size=self.kernel_size, stride=self.stride, padding=2),
+            nn.BatchNorm2d(self.nb_filters),
+            nn.ReLU(inplace=True)
+        )
+
+        #decoder
+        self.deconv_block1 = nn.Sequential(
+            nn.ConvTranspose2d(in_channels=self.nb_filters, out_channels=self.nb_filters, kernel_size=self.kernel_size, stride=self.stride, padding=2, output_padding=1),
+            nn.BatchNorm2d(self.nb_filters),
+            nn.ReLU(inplace=True)
+        )
+
+        self.deconv_block2 = nn.Sequential(
+            nn.ConvTranspose2d(in_channels=self.nb_filters, out_channels=self.nb_filters, kernel_size=self.kernel_size, stride=self.stride, padding=2, output_padding=1),
+            nn.BatchNorm2d(self.nb_filters),
+            nn.ReLU(inplace=True)
+        )
+
+        self.deconv_block3 = nn.Sequential(
+            nn.ConvTranspose2d(in_channels=self.nb_filters, out_channels=self.nb_filters, kernel_size=self.kernel_size, stride=self.stride, padding=2, output_padding=1),
+            nn.BatchNorm2d(self.nb_filters),
+            nn.ReLU(inplace=True)
+        )
+
+        self.deconv_block4 = nn.Sequential(
+            nn.ConvTranspose2d(in_channels=self.nb_filters, out_channels=self.nb_filters, kernel_size=self.kernel_size, stride=self.stride, padding=2, output_padding=1),
+            nn.BatchNorm2d(self.nb_filters),
+            nn.ReLU(inplace=True)
+        )
+
+        self.deconv_block5 = nn.Sequential(
+            nn.ConvTranspose2d(in_channels=self.nb_filters, out_channels=self.nb_filters, kernel_size=self.kernel_size, stride=self.stride, padding=2, output_padding=1),
+            nn.BatchNorm2d(self.nb_filters),
+            nn.ReLU(inplace=True)
+        )
+
+        self.output_layer = nn.Sequential(
+            nn.Conv2d(self.nb_filters, 1, kernel_size=self.kernel_size, stride=1, padding=2),
+            nn.Sigmoid()
+        )
+
+    def _get_padding(self, size, kernel_size=3, stride=1, dilation=1):
+        padding = ((size - 1) * (stride - 1) + dilation * (kernel_size - 1)) // 2
+        return padding
+
+    def conv_block(self, in_f, out_f, *args, **kwargs):
+        return nn.Sequential(
+            nn.Conv2d(in_f, out_f, *args, **kwargs),
+            nn.BatchNorm2d(out_f),
+            nn.ReLU(inplace=True)
         )
 
     def forward(self, x):
-        encoded = self.encoder(x)
-        decoded = self.decoder(encoded)
-        return encoded, decoded
+        # encoding part
+        # print("input", x.shape)
+        x = self.conv_block1(x)
+        # print("conv_block1", x.shape)
+        x = self.conv_block2(x)
+        # print("conv_block2", x.shape)
+        x = self.conv_block3(x)
+        # print("conv_block3", x.shape)
+        x = self.conv_block4(x)
+        # print("conv_block4", x.shape)
+        x = self.conv_block5(x)
+        # print("conv_block5", x.shape)
+
+        # print("---\n")
+        # decoding part
+        x = self.deconv_block1(x)
+        # print("deconv_block1", x.shape)
+        x = self.deconv_block2(x)
+        # print("deconv_block2", x.shape)
+        x = self.deconv_block3(x)
+        # print("deconv_block3", x.shape)
+        x = self.deconv_block4(x)
+        # print("deconv_block4", x.shape)
+        x = self.deconv_block5(x)
+        # print("deconv_block5", x.shape)
+
+        x = self.output_layer(x)
+        # print("output_layer", x.shape)
+
+        return x

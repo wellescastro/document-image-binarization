@@ -57,7 +57,8 @@ class DIBCODataset(Dataset):
         Y_train = np.asarray(Y_train).astype('float32')
 
         # invert pixel values
-        X_train = 255 - X_train
+        X_train = 255. - X_train
+        X_train /= 255.
 
         # normalize target image and invert pixel values
         Y_train /= 255.
