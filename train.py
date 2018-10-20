@@ -161,35 +161,6 @@ def main():
 
     load_weights(net, "checkpoints/model_best.pth")
 
-    # list_of_patches = testing_set.list_of_patches
-    # old_sum = sum(list_of_patches[:0]) # empty
-    # for i in range(len(testing_set.list_of_patches)):
-    #     # get the patches of each testing image
-    #     input_patches = testing_set.X_train[old_sum:sum(list_of_patches[:i+1])]
-    #     target_patches = testing_set.Y_train[old_sum:sum(list_of_patches[:i+1])]
-
-    #     # evaluation here
-    #     inputs, target = torch.from_numpy(input_patches).float().to('cuda'), torch.from_numpy(target_patches).float().to('cuda')
-    #     inputs, target = inputs.unsqueeze(1), target.unsqueeze(1)
-
-    #     # forward
-    #     logits = net.forward(inputs)
-    #     pred = (logits > threshold).float()
-
-    #     print(len(input_patches))
-    #     print(list_of_patches[i])
-    #     print(pred.shape)
-
-    #     pred = pred.view(list_of_patches[i], window_size[0], window_size[1])
-    #     print(pred.cpu().numpy().shape)
-
-    #     testing_set.unblockshaped(input_patches, window_size[0], window_size[1])
-        
-    #     old_sum = sum(testing_set.list_of_patches[:i+1])
-
-    #     exit()
-
-
     strides = (128, 128)
 
     # starting final evaluation using the reconstructed image
