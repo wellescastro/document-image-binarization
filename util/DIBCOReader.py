@@ -6,6 +6,7 @@ import numpy as np
 from skimage.util.shape import view_as_blocks
 import random
 from PIL import Image
+from util.sliding_window import sliding_window_view
 
 class DIBCODataset(Dataset):
 
@@ -19,7 +20,7 @@ class DIBCODataset(Dataset):
         2016: ['handwritten']
     }
 
-    def __init__(self, basepath="/home/dayvidwelles/phd/code/computer-vision-project/data/Dibco", years=[2009,2010,2011,2012,2013,2014], transform=None, window_size=(256,256)):
+    def __init__(self, basepath="/home/dayvidwelles/phd/code/computer-vision-project/data/Dibco", years=[2009,2010,2011,2012,2013,2014], transform=None, window_size=(256,256), stride=(128,128)):
         data_files = []
         for year in years:
             for subset in self.DIBCO[year]:
@@ -30,44 +31,67 @@ class DIBCODataset(Dataset):
 
         X_train = []
         Y_train = []
+        list_of_patches = []
 
-        for filename_gr in self.data_files:
+        for filename_gr in self.data_files[1:]:
             filename_gt = filename_gr.replace("GR", "GT")
                            
             img_gr = cv2.imread(filename_gr, cv2.IMREAD_GRAYSCALE)
             img_gt = cv2.imread(filename_gt, cv2.IMREAD_GRAYSCALE)
 
-            # sliding window approach
             img_gr_h, img_gr_w = img_gr.shape
-            new_gr_h, new_gr_w = int( window_size[0] * round( float(img_gr_h) / window_size[0] )), int( window_size[1] * round( float(img_gr_w) / window_size[1] ))
 
-            img_gr = cv2.resize(img_gr, (new_gr_w, new_gr_h), interpolation = cv2.INTER_CUBIC)
-            img_gt = cv2.resize(img_gt, (new_gr_w, new_gr_h), interpolation = cv2.INTER_CUBIC)
+            # resize image to the nearest shape divisible per the window size
+            # new_gr_h, new_gr_w = int( window_size[0] * round( float(img_gr_h) / window_size[0] )), int( window_size[1] * round( float(img_gr_w) / window_size[1] ))
+            # img_gr = cv2.resize(img_gr, (new_gr_w, new_gr_h), interpolation = cv2.INTER_CUBIC)
+            # img_gt = cv2.resize(img_gt, (new_gr_w, new_gr_h), interpolation = cv2.INTER_CUBIC)
+            
+            # apply padding instead of resizing
+            horizontal_padding = int(window_size[1] * np.ceil( float(img_gr_w) / window_size[1] ) - img_gr_w)
+            vertical_padding = int(window_size[0] * np.ceil( float(img_gr_h) / window_size[0] ) - img_gr_h)
 
-            # img_gr_patches = view_as_blocks(img_gr, window_size).reshape(-1, window_size[0], window_size[1])
+            img_gr = np.pad(img_gr, ((vertical_padding/2, vertical_padding/2 + vertical_padding%2),(horizontal_padding/2, horizontal_padding/2 + horizontal_padding%2)), mode='constant', constant_values=255)
+            img_gt = np.pad(img_gt, ((vertical_padding/2, vertical_padding/2 + vertical_padding%2),(horizontal_padding/2, horizontal_padding/2 + horizontal_padding%2)), mode='constant', constant_values=255)
+            
+            # sliding window approach, there are three alternatives but only the last one allows stride different than the window size
+            # img_gr_patches = view_as_blocks(img_gr, window_size).reshape(-1, window_size[0], window_size[1]) 
             # img_gt_patches = view_as_blocks(img_gt, window_size).reshape(-1, window_size[0], window_size[1])
-            img_gr_patches = self.blockshaped(img_gr, window_size[0], window_size[1])
-            img_gt_patches = self.blockshaped(img_gt, window_size[0], window_size[1])
+            # img_gr_patches = self.blockshaped(img_gr, window_size[0], window_size[1])
+            # img_gt_patches = self.blockshaped(img_gt, window_size[0], window_size[1])
 
+            img_gr_patches = sliding_window_view(img_gr, window_size, step=stride)
+            img_gt_patches = sliding_window_view(img_gt, window_size, step=stride)
+            img_gr_patches = img_gr_patches.reshape(-1, window_size[0], window_size[1])
+            img_gt_patches = img_gt_patches.reshape(-1, window_size[0], window_size[1])
+            
+            # sanity check of the sliding window approach, disable reshaping before the test
+            # img_gr_reconstructed = np.zeros(img_gr.shape, dtype=np.uint8)
+            # for ind1, row_of_patches in enumerate(img_gr_patches):
+            #     for ind2, patch in enumerate(row_of_patches):
+            #         i_0 = ind1 * stride[0]
+            #         i_f = i_0 + window_size[0]
+            #         j_0 = ind2 * stride[1]
+            #         j_f = j_0 + window_size[1]
+            #         img_gr_reconstructed[i_0:i_f, j_0:j_f] = patch
+            
+            # img_gt_reconstructed = np.zeros(img_gt.shape, dtype=np.uint8)
+            # for ind1, row_of_patches in enumerate(img_gt_patches):
+            #     for ind2, patch in enumerate(row_of_patches):
+            #         i_0 = ind1 * stride[0]
+            #         i_f = i_0 + window_size[0]
+            #         j_0 = ind2 * stride[1]
+            #         j_f = j_0 + window_size[1]
+            #         img_gt_reconstructed[i_0:i_f, j_0:j_f] = patch
+   
             X_train.extend(img_gr_patches)
             Y_train.extend(img_gt_patches)
-            
-        # convert to arrays
-        X_train = np.asarray(X_train).astype('float32')
-        Y_train = np.asarray(Y_train).astype('float32')
-
-        # invert pixel values
-        X_train = 255. - X_train
-        # X_train /= 255.
-
-        # normalize target image and invert pixel values
-        Y_train /= 255.
-        Y_train = 1 - Y_train
+            list_of_patches.append(len(img_gr_patches))
 
         self.X_train = X_train
         self.Y_train = Y_train
         self.transform = transform
         self.target_transform = transform
+        self.list_of_patches = list_of_patches
 
     def blockshaped(self, arr, nrows, ncols):
         """
@@ -97,10 +121,14 @@ class DIBCODataset(Dataset):
                 .reshape(h, w))
     
     def __getitem__(self, index):
-        img_gr = Image.fromarray(self.X_train[index])
-        img_gt = Image.fromarray(self.Y_train[index])
-        # img_gr = self.X_train[index]
-        # img_gt = self.Y_train[index]
+        # img_gr = Image.fromarray(self.X_train[index]) # disabled since i'm using ToPILImage transform
+        # img_gt = Image.fromarray(self.Y_train[index]) # disabled since i'm using ToPILImage transform
+        img_gr = self.X_train[index]
+        img_gt = self.Y_train[index]
+        
+        # match PIL shape requirements
+        img_gr = np.expand_dims(img_gr, 2)
+        img_gt = np.expand_dims(img_gt, 2)
         
         seed = np.random.randint(2147483647) # make a seed with numpy generator 
         random.seed(seed) # apply this seed to img tranfsorms
