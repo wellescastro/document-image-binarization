@@ -8,43 +8,13 @@ from models.AutoEncoder import AutoEncoder
 import torch.optim as optim
 from torch.autograd import Variable
 from models import losses
-import shutil
 from EarlyStopping import EarlyStopping
 from metrics import f2_score, mse_score
-
+from util.utils import save_checkpoint, load_checkpoint
+import os
 
 def criterion(logits, labels):
     return losses.F1ScoreLoss().forward(logits, labels)
-
-def save_checkpoint(state, is_best, checkpoint_dir):
-    filename = os.path.join(checkpoint_dir, 'auto_encoder-epoch-{}.pth'.format(state["epoch"]))
-    torch.save(state, filename)
-    if is_best:
-        shutil.copyfile(filename, checkpoint_dir + 'model_best.pth')
-
-# TODO: built the checkpoint loading, here's a helper
-def load_checkpoint(checkpoint, model, optimizer):
-    """ loads state into model and optimizer and returns:
-        epoch, best_precision, loss_train[]
-    """
-    if os.path.isfile(load_path):
-        print("=> loading checkpoint '{}'".format(load_path))
-        checkpoint = torch.load(load_path)
-        epoch = checkpoint['epoch']
-        best_prec = checkpoint['best_prec']
-        loss_train = checkpoint['loss_train']
-        model.load_state_dict(checkpoint['state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer'])
-        print("=> loaded checkpoint '{}' (epoch {})"
-              .format(epoch, checkpoint['epoch']))
-        return epoch, best_prec, loss_train
-    else:
-        print("=> no checkpoint found at '{}'".format(load_path))
-        # epoch, best_precision, loss_train
-        return 1, 0, []
-
-def evaluate_fmeasure(predictions, labels):
-    return 1
 
 def main():
     # Hyperparameters
@@ -55,9 +25,10 @@ def main():
     window_size = 256,256
 
     # Training informartion
-    train_log_step = 200
-    save_freq = 1
+    start_epoch = 0
     model_weiths_path = "checkpoints/"
+    resume_training = True
+    resume_checkpoint = model_weiths_path + "auto_encoder-epoch-51.pth"
 
     use_cuda = torch.cuda.is_available()
 
@@ -97,10 +68,24 @@ def main():
     print("Training on {} samples and testing on {} samples "
           .format(len(train_loader.dataset), len(test_loader.dataset)))
 
-    best_training_loss = 99999
-    early_stopper = EarlyStopping(mode='min', patience=20)
+    early_stopper = EarlyStopping(mode='min', patience=early_stopping_patience)
 
-    for epoch in range(epochs):
+
+    # optionally resume from a checkpoint
+    if resume_training:
+        if os.path.isfile(resume_checkpoint):
+            print("=> loading checkpoint '{}'".format(resume_checkpoint))
+            checkpoint = torch.load(resume_checkpoint)
+            start_epoch = checkpoint['epoch']
+            early_stopper.best = checkpoint['best_training_loss']
+            net.load_state_dict(checkpoint['state_dict'])
+            optimizer.load_state_dict(checkpoint['optimizer'])
+            print("=> loaded checkpoint '{}' (epoch {})"
+                  .format(resume_checkpoint, checkpoint['epoch']))
+        else:
+            print("=> no checkpoint found at '{}'".format(resume_checkpoint))
+
+    for epoch in range(start_epoch, epochs):
         training_metrics = {'loss':0, 'mse':0, 'f1score':0}
         testing_metrics = {'loss':0, 'mse':0, 'f1score':0}
 
@@ -115,7 +100,6 @@ def main():
 
             # forward
             logits = net.forward(inputs)
-            pred = (logits > threshold).float()
 
             # backward + optimize
             loss = criterion(logits, target)
@@ -146,6 +130,7 @@ def main():
 
                 # forward
                 logits = net.forward(inputs)
+
                 loss = criterion(logits, target)
 
                 testing_metrics['loss'] += loss.item()
@@ -154,7 +139,7 @@ def main():
                 # get thresholded prediction and compute the f1-score per patches
                 testing_metrics['f1score'] += f2_score(target.view(-1, window_size[0] * window_size[1]), logits.view(-1, window_size[0] * window_size[1]), threshold=threshold).item()
         
-        # get the average validation loss and f1score
+        # get the average of the metrics
         testing_metrics['loss'] /= len(test_loader)
         testing_metrics['mse'] /= len(test_loader)
         testing_metrics['f1score'] /= len(test_loader)
@@ -162,8 +147,8 @@ def main():
         print('[%d, %d] train_loss: %.4f test_loss: %.4f train_mse: %.4f test_mse: %.4f train_f1score: %.4f test_f1score: %.4f current patience: %d' %
                     (epoch + 1, epochs, training_metrics['loss'], testing_metrics['loss'], training_metrics['mse'], testing_metrics['mse'], training_metrics['f1score'], testing_metrics['f1score'], early_stopper.patience))
 
-        # remember best training loss and save checkpoint
-        is_best = training_metrics['loss'] < best_training_loss
+        # save checkpoint
+        is_best = training_metrics['loss'] < early_stopper.best
 
         if early_stopper.step(training_metrics['loss']) == True:
             print("Early stopping triggered!")
