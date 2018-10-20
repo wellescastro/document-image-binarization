@@ -86,6 +86,12 @@ class DIBCODataset(Dataset):
             X_train.extend(img_gr_patches)
             Y_train.extend(img_gt_patches)
             list_of_patches.append(len(img_gr_patches))
+        
+        X_train = np.asarray(X_train)
+        Y_train = np.asarray(Y_train)
+
+        X_train = 255 - X_train
+        Y_train = 255 - Y_train
 
         self.X_train = X_train
         self.Y_train = Y_train
