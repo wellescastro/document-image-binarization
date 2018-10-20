@@ -174,10 +174,6 @@ def main():
                 #preprocessing
                 img_gr = 255 - img_gr
 
-                dim_row, dim_col = img_gr.shape
-
-                # tiles_per_row, tiles_per_col = int(dim_row // float(strides[0])), int(dim_row // float(strides[1]))
-
                 img_prediction = np.zeros(img_gr.shape, dtype=np.uint8)
                 for coords, patch in sliding_window(img_gr, strides, window_size):
                     patch_size = patch.shape

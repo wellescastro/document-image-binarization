@@ -46,14 +46,14 @@ class DIBCODataset(Dataset):
             # img_gr = cv2.resize(img_gr, (new_gr_w, new_gr_h), interpolation = cv2.INTER_CUBIC)
             # img_gt = cv2.resize(img_gt, (new_gr_w, new_gr_h), interpolation = cv2.INTER_CUBIC)
             
-            # apply padding instead of resizing
+            # apply padding instead of resizing to avoid losing significant information
             horizontal_padding = int(window_size[1] * np.ceil( float(img_gr_w) / window_size[1] ) - img_gr_w)
             vertical_padding = int(window_size[0] * np.ceil( float(img_gr_h) / window_size[0] ) - img_gr_h)
 
             img_gr = np.pad(img_gr, ((vertical_padding/2, vertical_padding/2 + vertical_padding%2),(horizontal_padding/2, horizontal_padding/2 + horizontal_padding%2)), mode='constant', constant_values=255)
             img_gt = np.pad(img_gt, ((vertical_padding/2, vertical_padding/2 + vertical_padding%2),(horizontal_padding/2, horizontal_padding/2 + horizontal_padding%2)), mode='constant', constant_values=255)
             
-            # sliding window approach, there are three alternatives but only the last one allows stride different than the window size
+            # sliding window approach, there are three alternatives but only the last one allows specifying the stride
             # img_gr_patches = view_as_blocks(img_gr, window_size).reshape(-1, window_size[0], window_size[1]) 
             # img_gt_patches = view_as_blocks(img_gt, window_size).reshape(-1, window_size[0], window_size[1])
             # img_gr_patches = self.blockshaped(img_gr, window_size[0], window_size[1])
@@ -99,6 +99,7 @@ class DIBCODataset(Dataset):
         self.target_transform = transform
         self.list_of_patches = list_of_patches
 
+
     def blockshaped(self, arr, nrows, ncols):
         """
         Return an array of shape (n, nrows, ncols) where
@@ -126,6 +127,7 @@ class DIBCODataset(Dataset):
                 .swapaxes(1,2)
                 .reshape(h, w))
     
+
     def __getitem__(self, index):
         # img_gr = Image.fromarray(self.X_train[index]) # disabled since i'm using ToPILImage transform
         # img_gt = Image.fromarray(self.Y_train[index]) # disabled since i'm using ToPILImage transform
@@ -146,6 +148,7 @@ class DIBCODataset(Dataset):
             img_gt = self.target_transform(img_gt)
 
         return (img_gr, img_gt)
+
 
     def __len__(self):
         return len(self.X_train) # of how many examples(images?) you have
