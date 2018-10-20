@@ -22,7 +22,7 @@ def criterion(logits, labels):
 
 def main():
     # Hyperparameters
-    batch_size = 9
+    batch_size = 10
     epochs = 200
     threshold = 0.5
     early_stopping_patience = 20
