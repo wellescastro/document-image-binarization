@@ -19,7 +19,7 @@ class DIBCODataset(Dataset):
         2016: ['handwritten']
     }
 
-    def __init__(self, basepath="/home/dayvidwelles/phd/code/computer-vision-project/data/Dibco", years=[2009,2010,2011,2012,2013,2014], transform=None, windows_size=(256,256)):
+    def __init__(self, basepath="/home/dayvidwelles/phd/code/computer-vision-project/data/Dibco", years=[2009,2010,2011,2012,2013,2014], transform=None, window_size=(256,256)):
         data_files = []
         for year in years:
             for subset in self.DIBCO[year]:
@@ -39,15 +39,15 @@ class DIBCODataset(Dataset):
 
             # sliding window approach
             img_gr_h, img_gr_w = img_gr.shape
-            new_gr_h, new_gr_w = int( windows_size[0] * round( float(img_gr_h) / windows_size[0] )), int( windows_size[1] * round( float(img_gr_w) / windows_size[1] ))
+            new_gr_h, new_gr_w = int( window_size[0] * round( float(img_gr_h) / window_size[0] )), int( window_size[1] * round( float(img_gr_w) / window_size[1] ))
 
             img_gr = cv2.resize(img_gr, (new_gr_w, new_gr_h), interpolation = cv2.INTER_CUBIC)
             img_gt = cv2.resize(img_gt, (new_gr_w, new_gr_h), interpolation = cv2.INTER_CUBIC)
 
-            # img_gr_patches = view_as_blocks(img_gr, windows_size).reshape(-1, windows_size[0], windows_size[1])
-            # img_gt_patches = view_as_blocks(img_gt, windows_size).reshape(-1, windows_size[0], windows_size[1])
-            img_gr_patches = self.blockshaped(img_gr, windows_size[0], windows_size[1])
-            img_gt_patches = self.blockshaped(img_gt, windows_size[0], windows_size[1])
+            # img_gr_patches = view_as_blocks(img_gr, window_size).reshape(-1, window_size[0], window_size[1])
+            # img_gt_patches = view_as_blocks(img_gt, window_size).reshape(-1, window_size[0], window_size[1])
+            img_gr_patches = self.blockshaped(img_gr, window_size[0], window_size[1])
+            img_gt_patches = self.blockshaped(img_gt, window_size[0], window_size[1])
 
             X_train.extend(img_gr_patches)
             Y_train.extend(img_gt_patches)
@@ -58,7 +58,7 @@ class DIBCODataset(Dataset):
 
         # invert pixel values
         X_train = 255. - X_train
-        X_train /= 255.
+        # X_train /= 255.
 
         # normalize target image and invert pixel values
         Y_train /= 255.

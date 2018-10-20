@@ -10,6 +10,8 @@ from torch.autograd import Variable
 from models import losses
 import shutil
 from EarlyStopping import EarlyStopping
+from metrics import f2_score, mse_score
+
 
 def criterion(logits, labels):
     return losses.F1ScoreLoss().forward(logits, labels)
@@ -18,7 +20,31 @@ def save_checkpoint(state, is_best, checkpoint_dir):
     filename = os.path.join(checkpoint_dir, 'auto_encoder-epoch-{}.pth'.format(state["epoch"]))
     torch.save(state, filename)
     if is_best:
-        shutil.copyfile(filename, checkpoint_dir + 'model_best.pth.tar')
+        shutil.copyfile(filename, checkpoint_dir + 'model_best.pth')
+
+# TODO: built the checkpoint loading, here's a helper
+def load_checkpoint(checkpoint, model, optimizer):
+    """ loads state into model and optimizer and returns:
+        epoch, best_precision, loss_train[]
+    """
+    if os.path.isfile(load_path):
+        print("=> loading checkpoint '{}'".format(load_path))
+        checkpoint = torch.load(load_path)
+        epoch = checkpoint['epoch']
+        best_prec = checkpoint['best_prec']
+        loss_train = checkpoint['loss_train']
+        model.load_state_dict(checkpoint['state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer'])
+        print("=> loaded checkpoint '{}' (epoch {})"
+              .format(epoch, checkpoint['epoch']))
+        return epoch, best_prec, loss_train
+    else:
+        print("=> no checkpoint found at '{}'".format(load_path))
+        # epoch, best_precision, loss_train
+        return 1, 0, []
+
+def evaluate_fmeasure(predictions, labels):
+    return 1
 
 def main():
     # Hyperparameters
@@ -26,6 +52,7 @@ def main():
     epochs = 200
     threshold = 0.5
     early_stopping_patience = 20
+    window_size = 256,256
 
     # Training informartion
     train_log_step = 200
@@ -44,12 +71,12 @@ def main():
     training_set = DIBCODataset(years=[2009,2010,2011,2012,2013,2014],
     transform = transforms.Compose([
                 transforms.RandomHorizontalFlip(), 
-                transforms.ToTensor()])
+                transforms.ToTensor()]), window_size=window_size
     )
 
     testing_set = DIBCODataset(years=[2016], 
     transform = transforms.Compose([ 
-                transforms.ToTensor()])
+                transforms.ToTensor()]), window_size=window_size
     )
 
     train_loader = DataLoader(training_set,
@@ -74,9 +101,9 @@ def main():
     early_stopper = EarlyStopping(mode='min', patience=20)
 
     for epoch in range(epochs):
-        training_loss = 0
-        testing_loss = 0
-        
+        training_metrics = {'loss':0, 'mse':0, 'f1score':0}
+        testing_metrics = {'loss':0, 'mse':0, 'f1score':0}
+
         # perform training
         net.train()
         for ind, (inputs, target) in enumerate(train_loader):
@@ -96,10 +123,16 @@ def main():
             loss.backward()
             optimizer.step()
 
-            training_loss += loss.item()
+            training_metrics['loss'] += loss.item()
+            training_metrics['mse'] += mse_score(logits, target)
+
+            # get thresholded prediction and compute the f1-score per patches
+            training_metrics['f1score'] += f2_score(target.view(-1, window_size[0] * window_size[1]), logits.view(-1, window_size[0] * window_size[1]), threshold=threshold).item()
         
         # get the average training loss
-        training_loss /= len(train_loader)
+        training_metrics['loss'] /= len(train_loader)
+        training_metrics['mse'] /= len(train_loader)
+        training_metrics['f1score'] /= len(train_loader)
         
         # perform validation 
         net.eval()
@@ -115,22 +148,25 @@ def main():
                 logits = net.forward(inputs)
                 loss = criterion(logits, target)
 
-                testing_loss += loss
+                testing_metrics['loss'] += loss.item()
+                testing_metrics['mse'] += mse_score(logits, target)
 
-                # get thresholded prediction and compute the f1-score
-                pred = (logits > threshold).float()
+                # get thresholded prediction and compute the f1-score per patches
+                testing_metrics['f1score'] += f2_score(target.view(-1, window_size[0] * window_size[1]), logits.view(-1, window_size[0] * window_size[1]), threshold=threshold).item()
         
-        # get the average validation loss
-        testing_loss /= len(test_loader)
+        # get the average validation loss and f1score
+        testing_metrics['loss'] /= len(test_loader)
+        testing_metrics['mse'] /= len(test_loader)
+        testing_metrics['f1score'] /= len(test_loader)
 
-        print('[%d, %d] train loss: %.4f test loss: %.4f current stopping patience: %.4f' %
-                    (epoch + 1, epochs, training_loss, testing_loss, early_stopper.patience))
+        print('[%d, %d] train_loss: %.4f test_loss: %.4f train_mse: %.4f test_mse: %.4f train_f1score: %.4f test_f1score: %.4f current patience: %d' %
+                    (epoch + 1, epochs, training_metrics['loss'], testing_metrics['loss'], training_metrics['mse'], testing_metrics['mse'], training_metrics['f1score'], testing_metrics['f1score'], early_stopper.patience))
 
         # remember best training loss and save checkpoint
-        is_best = training_loss < best_training_loss
+        is_best = training_metrics['loss'] < best_training_loss
 
-        if early_stopper.step(training_loss) == True:
-            print("Training finished!")
+        if early_stopper.step(training_metrics['loss']) == True:
+            print("Early stopping triggered!")
             break
 
         save_checkpoint({
@@ -139,10 +175,6 @@ def main():
             'best_training_loss': early_stopper.best,
             'optimizer' : optimizer.state_dict(),
         }, is_best, model_weiths_path)
-
-        # reset for the next epoch
-        training_loss = 0
-        testing_loss = 0
 
 if __name__ == '__main__':
     # TODO: add args functionality
