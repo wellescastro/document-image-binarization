@@ -69,21 +69,10 @@ def main():
           .format(len(train_loader.dataset), len(test_loader.dataset)))
 
     early_stopper = EarlyStopping(mode='min', patience=early_stopping_patience)
-
-
+    
     # optionally resume from a checkpoint
     if resume_training:
-        if os.path.isfile(resume_checkpoint):
-            print("=> loading checkpoint '{}'".format(resume_checkpoint))
-            checkpoint = torch.load(resume_checkpoint)
-            start_epoch = checkpoint['epoch']
-            early_stopper.best = checkpoint['best_training_loss']
-            net.load_state_dict(checkpoint['state_dict'])
-            optimizer.load_state_dict(checkpoint['optimizer'])
-            print("=> loaded checkpoint '{}' (epoch {})"
-                  .format(resume_checkpoint, checkpoint['epoch']))
-        else:
-            print("=> no checkpoint found at '{}'".format(resume_checkpoint))
+        start_epoch, early_stopper.best = load_checkpoint(net, optimizer, resume_checkpoint)
 
     for epoch in range(start_epoch, epochs):
         training_metrics = {'loss':0, 'mse':0, 'f1score':0}
@@ -160,6 +149,9 @@ def main():
             'best_training_loss': early_stopper.best,
             'optimizer' : optimizer.state_dict(),
         }, is_best, model_weiths_path)
+    
+
+    load_checkpoint(net)
 
 if __name__ == '__main__':
     # TODO: add args functionality
