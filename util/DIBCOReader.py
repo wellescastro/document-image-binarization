@@ -20,7 +20,7 @@ class DIBCODataset(Dataset):
         2016: ['handwritten']
     }
 
-    def __init__(self, basepath="/home/dayvidwelles/phd/code/computer-vision-project/data/Dibco", years=[2009,2010,2011,2012,2013,2014], transform=None, window_size=(256,256), stride=(128,128)):
+    def __init__(self, basepath="/home/dayvidwelles/phd/code/computer-vision-project/data/Dibco", years=[2009,2010,2011,2012,2013,2014], transform=None, target_transform=None, window_size=(256,256), stride=(128,128)):
         data_files = []
         for year in years:
             for subset in self.DIBCO[year]:

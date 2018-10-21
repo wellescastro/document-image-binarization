@@ -16,9 +16,36 @@ from util.utils import save_checkpoint, load_checkpoint, load_weights
 from skimage.util.shape import view_as_blocks
 from PIL import Image
 from util.sliding_window import sliding_window_view
+from util.dbico_metrics import compute_metrics
 
 def criterion(logits, labels):
     return losses.F1ScoreLoss().forward(logits, labels)
+
+class ToTensorNoScale(object):
+    def __init__(self):
+        pass
+    def __call__(self, pic):
+        if isinstance(pic, np.ndarray):
+            # handle numpy array
+            img = torch.from_numpy(pic.transpose((2, 0, 1)))
+            # backward compatibility
+            if isinstance(img, torch.ByteTensor):
+                return img.float()
+            else:
+                return img
+
+        # handle PIL Image
+        img = torch.from_numpy(np.array(pic, np.uint8, copy=False))
+        
+        nchannel = len(pic.mode)
+        img = img.view(pic.size[1], pic.size[0], nchannel)
+        # put it from HWC to CHW format
+        # yikes, this transpose takes 80% of the loading time/CPU
+        img = img.transpose(0, 1).transpose(0, 2).contiguous()
+        
+        if isinstance(img, torch.ByteTensor):
+            return img.float()
+        return img
 
 def main():
     # Hyperparameters
@@ -27,12 +54,13 @@ def main():
     threshold = 0.5
     early_stopping_patience = 20
     window_size = 256,256
+    strides = 128,128
 
     # Training informartion
     start_epoch = 0
     model_weiths_path = "checkpoints/"
     resume_training = False
-    resume_checkpoint = model_weiths_path + "auto_encoder-epoch-51.pth"
+    resume_checkpoint = model_weiths_path + "auto_encoder2-epoch-1.pth"
 
     use_cuda = torch.cuda.is_available()
 
@@ -42,21 +70,32 @@ def main():
     optimizer = optim.Adam(net.parameters(), lr=0.001, betas=(0.9, 0.999))
 
     # define the dataset and data augmentation operations
-
     training_transforms = transforms.Compose([
                 transforms.ToPILImage(mode='L'),
+                transforms.RandomHorizontalFlip(),
+                ToTensorNoScale() 
+                ])
+
+    training_target_transforms = transforms.Compose([
+                transforms.ToPILImage(mode='L'),
                 transforms.RandomHorizontalFlip(), 
-                transforms.ToTensor()])
+                transforms.ToTensor()
+                ])
+
 
     training_set = DIBCODataset(years=[2009,2010,2011,2012,2013,2014],
-    transform = training_transforms, window_size=window_size
+    transform = training_transforms, target_transform=training_target_transforms, window_size=window_size, stride=strides
     )
 
     testing_transforms = transforms.Compose([ 
-                transforms.ToPILImage(mode='L'),
-                transforms.ToTensor()])
+        ToTensorNoScale()])
+
+    testing_target_transforms = transforms.Compose([
+        transforms.ToTensor()
+    ])
+
     testing_set = DIBCODataset(years=[2016], 
-    transform = testing_transforms, window_size=window_size
+    transform = testing_transforms, target_transform=testing_target_transforms, window_size=window_size, stride=strides
     )
 
     train_loader = DataLoader(training_set,
@@ -80,7 +119,7 @@ def main():
     
     # optionally resume from a checkpoint
     if resume_training:
-        start_epoch, early_stopper.best = load_checkpoint(net, optimizer, resume_checkpoint)
+        start_epoch, early_stopper.best, early_stopper.num_bad_epochs = load_checkpoint(net, optimizer, resume_checkpoint)
 
     for epoch in range(start_epoch, epochs):
         training_metrics = {'loss':0, 'mse':0, 'f1score':0}
@@ -142,7 +181,7 @@ def main():
         testing_metrics['f1score'] /= len(test_loader)
 
         print('[%d, %d] train_loss: %.4f test_loss: %.4f train_mse: %.4f test_mse: %.4f train_f1score: %.4f test_f1score: %.4f current patience: %d' %
-                    (epoch + 1, epochs, training_metrics['loss'], testing_metrics['loss'], training_metrics['mse'], testing_metrics['mse'], training_metrics['f1score'], testing_metrics['f1score'], early_stopper.patience))
+                    (epoch + 1, epochs, training_metrics['loss'], testing_metrics['loss'], training_metrics['mse'], testing_metrics['mse'], training_metrics['f1score'], testing_metrics['f1score'], (early_stopper.patience - early_stopper.num_bad_epochs)))
 
         # save checkpoint
         is_best = training_metrics['loss'] < early_stopper.best
@@ -155,6 +194,7 @@ def main():
             'epoch': epoch + 1,
             'state_dict': net.state_dict(),
             'best_training_loss': early_stopper.best,
+            'num_bad_epochs': early_stopper.num_bad_epochs,
             'optimizer' : optimizer.state_dict(),
         }, is_best, model_weiths_path)
     
@@ -164,43 +204,50 @@ def main():
     strides = (128, 128)
 
     # starting final evaluation using the reconstructed image
+    fmeasures = []
+    # maybe gonna be used for feeding with imgs between 0 and 255
+    # final_transforms = transforms.Compose([ 
+    #         transforms.Lambda(lambda cv2img:torch.from_numpy(cv2img).float().to('cuda'))])
+
     with torch.no_grad():
         for filename_gr in testing_set.data_files:
-                filename_gt = filename_gr.replace("GR", "GT")
-                                
-                img_gr = cv2.imread(filename_gr, cv2.IMREAD_GRAYSCALE)
-                img_gt = cv2.imread(filename_gt, cv2.IMREAD_GRAYSCALE)
+            filename_gt = filename_gr.replace("GR", "GT")
+                            
+            img_gr = cv2.imread(filename_gr, cv2.IMREAD_GRAYSCALE)
+            img_gt = cv2.imread(filename_gt, cv2.IMREAD_GRAYSCALE)
 
-                #preprocessing
-                img_gr = 255 - img_gr
+            #preprocessing
+            img_gr = 255 - img_gr
 
-                img_prediction = np.zeros(img_gr.shape, dtype=np.uint8)
-                for coords, patch in sliding_window(img_gr, strides, window_size):
-                    patch_size = patch.shape
+            img_prediction = np.zeros(img_gr.shape, dtype=np.uint8)
+            for coords, patch in sliding_window(img_gr, strides, window_size):
+                patch_size = patch.shape
 
-                    vertical_padding = (window_size[0] - patch_size[0])
-                    horizontal_padding = (window_size[1] - patch_size[1])
-                    patch_gr = np.pad(patch, ((0,vertical_padding),(0,horizontal_padding)),mode='constant')
-                    patch_gr_with_channel = np.expand_dims(patch_gr, 2)
-        
-                    inputs = testing_transforms(patch_gr_with_channel).cuda()
-                    inputs = inputs.unsqueeze(1)
-
-                    # forward
-                    logits = net(inputs)
-                    pred = (logits > threshold).float() # threshold the output activation map
-                    pred = logits.squeeze() # remove all dimensions of size 1 (batch dimension and channel dimension)
-
-                    prediction_unpadded = pred[0:window_size[0]-vertical_padding, 0:window_size[1]-horizontal_padding]
-                    img_prediction[coords[0]:coords[1],coords[2]:coords[3]] = prediction_unpadded
-                    
-
-                Image.fromarray(img_prediction, mode='1').show()
-                exit()
-
-                inputs = torch.from_numpy(patch_gr).float().to('cuda')
-
+                vertical_padding = (window_size[0] - patch_size[0])
+                horizontal_padding = (window_size[1] - patch_size[1])
+                patch_gr = np.pad(patch, ((0,vertical_padding),(0,horizontal_padding)),mode='constant')
+                patch_gr_with_channel = np.expand_dims(patch_gr, 2) # change to 0 if using final transforms
     
+                inputs = testing_transforms(patch_gr_with_channel).cuda()
+                inputs = inputs.unsqueeze(1)
+
+                # forward
+                logits = net(inputs)
+                pred = (logits > threshold).float() # threshold the output activation map
+                pred = logits.squeeze() # remove all dimensions of size 1 (batch dimension and channel dimension)
+
+                prediction_unpadded = pred[0:window_size[0]-vertical_padding, 0:window_size[1]-horizontal_padding]
+                img_prediction[coords[0]:coords[1],coords[2]:coords[3]] = prediction_unpadded
+                
+            img_prediction *= 255
+            img_prediction = 255 - img_prediction
+
+            fmeasure, pfmeasure, psnr, nrm, mpm, drd = compute_metrics(img_prediction, img_gt)
+            fmeasures.append(fmeasure)
+        
+        print("final fmeasures", np.mean(fmeasures))
+        
+                
 
 
 def sliding_window(img, strides, window_size):

@@ -4,7 +4,7 @@ import os
 
 
 def save_checkpoint(state, is_best, checkpoint_dir):
-    filename = os.path.join(checkpoint_dir, 'auto_encoder-epoch-{}.pth'.format(state["epoch"]))
+    filename = os.path.join(checkpoint_dir, 'auto_encoder2-epoch-{}.pth'.format(state["epoch"]))
     torch.save(state, filename)
     if is_best:
         shutil.copyfile(filename, checkpoint_dir + 'model_best.pth')
@@ -19,11 +19,12 @@ def load_checkpoint(model, optimizer, load_path):
         checkpoint = torch.load(load_path)
         epoch = checkpoint['epoch']
         best_training_loss = checkpoint['best_training_loss']
+        num_bad_epochs = checkpoint['num_bad_epochs']
         model.load_state_dict(checkpoint['state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer'])
         print("=> loaded checkpoint '{}' (epoch {})"
               .format(epoch, checkpoint['epoch']))
-        return epoch, best_training_loss
+        return epoch, best_training_loss, num_bad_epochs
     else:
         print("=> no checkpoint found at '{}'".format(load_path))
         # epoch, best_precision, loss_train
