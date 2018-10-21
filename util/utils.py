@@ -3,8 +3,8 @@ import torch
 import os
 
 
-def save_checkpoint(state, is_best, checkpoint_dir):
-    filename = os.path.join(checkpoint_dir, 'auto_encoder2-epoch-{}.pth'.format(state["epoch"]))
+def save_checkpoint(state, is_best, checkpoint_dir, model_name):
+    filename = os.path.join(checkpoint_dir, '{}-epoch-{}.pth'.format(model_name, state["epoch"]))
     torch.save(state, filename)
     if is_best:
         shutil.copyfile(filename, checkpoint_dir + 'model_best.pth')
