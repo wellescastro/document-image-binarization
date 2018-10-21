@@ -6,7 +6,8 @@ import numpy as np
 from skimage.util.shape import view_as_blocks
 import random
 from PIL import Image
-from util.sliding_window import sliding_window_view
+# from util.sliding_window import sliding_window_view
+from sliding_window import sliding_window_view
 
 class DIBCODataset(Dataset):
 
@@ -146,6 +147,19 @@ class DIBCODataset(Dataset):
         random.seed(seed) # apply this seed to target tranfsorms
         if self.target_transform is not None:
             img_gt = self.target_transform(img_gt)
+        
+        # sanity check of the transforms
+        # a = img_gr.numpy()*255
+        # a = np.transpose(a, (1,2,0)).astype(np.uint8)
+        # a = np.squeeze(a)
+        # Image.fromarray(a).show()
+
+        # b = img_gt.numpy()*255
+        # b = np.transpose(b, (1,2,0)).astype(np.uint8)
+        # b = np.squeeze(b)
+        # Image.fromarray(b).show()
+
+        # exit()
 
         return (img_gr, img_gt)
 
@@ -156,7 +170,13 @@ class DIBCODataset(Dataset):
 
 if __name__ == '__main__':
     # Define transforms (1)
-    transformations = transforms.Compose([transforms.RandomHorizontalFlip(), transforms.ToTensor()])
+    transformations = transforms.Compose([
+        transforms.ToPILImage(mode='L'),
+               transforms.RandomHorizontalFlip(), transforms.ToTensor()])
+
+    transformations2 = transforms.Compose([
+    transforms.ToPILImage(mode='L'),
+            transforms.RandomHorizontalFlip(), transforms.ToTensor()])
     # Call the dataset
     # custom_dataset = MyCustomDataset(..., transformations)
-    data_loader = DIBCODataset(transform=transformations)
+    data_loader = DIBCODataset(transform=transformations, target_transform=transformations2)
