@@ -109,20 +109,20 @@ def main():
   
     # define the dataset and data augmentation operations
     training_transforms = transforms.Compose([
-                transforms.ToPILImage(mode='L'),
+                # transforms.ToPILImage(mode='L'),
                 # transforms.RandomResizedCrop(window_size[0], scale=(0.08, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2),
-                transforms.RandomAffine(degrees=0, scale=(0.5,1.5)),
+                # transforms.RandomAffine(degrees=0, scale=(0.5,1.5)),
                 # RandomAffineTransform(scale_range=(0.5,1.5),rotation_range=(0,0),shear_range=(0,0), translation_range=(0,0)),
-                transforms.RandomHorizontalFlip(),
+                # transforms.RandomHorizontalFlip(),
                 transforms.ToTensor() 
                 ])
 
     training_target_transforms = transforms.Compose([
-                transforms.ToPILImage(mode='L'),
+                # transforms.ToPILImage(mode='L'),
                 # transforms.RandomResizedCrop(window_size[0], scale=(0.08, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2),
-                transforms.RandomAffine(degrees=0, scale=(0.5,1.5)),
+                # transforms.RandomAffine(degrees=0, scale=(0.5,1.5)),
                 # RandomAffineTransform(scale_range=(0.5,1.5),rotation_range=(0,0),shear_range=(0,0), translation_range=(0,0)),
-                transforms.RandomHorizontalFlip(), 
+                # transforms.RandomHorizontalFlip(), 
                 transforms.ToTensor()
                 ])
 
