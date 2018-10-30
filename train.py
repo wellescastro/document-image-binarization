@@ -128,7 +128,7 @@ def main():
 
 
     training_set = DIBCODataset(years=[2009,2010,2011,2012,2013,2014],
-    transform = training_transforms, target_transform=training_transforms, window_size=window_size, stride=strides
+    transform = training_transforms, target_transform=training_transforms, window_size=window_size, stride=strides, include_augmentation=True
     )
 
     testing_transforms = transforms.Compose([ 
@@ -139,7 +139,7 @@ def main():
     ])
 
     testing_set = DIBCODataset(years=[2016], 
-    transform = testing_transforms, target_transform=testing_target_transforms, window_size=window_size, stride=strides
+    transform = testing_transforms, target_transform=testing_target_transforms, window_size=window_size, stride=strides, include_augmentation=False
     )
 
     train_loader = DataLoader(training_set,
