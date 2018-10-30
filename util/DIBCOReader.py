@@ -21,13 +21,17 @@ class DIBCODataset(Dataset):
         2016: ['handwritten']
     }
 
-    def __init__(self, basepath="/home/dayvidwelles/phd/code/computer-vision-project/data/Dibco", years=[2009,2010,2011,2012,2013,2014], transform=None, target_transform=None, window_size=(256,256), stride=(128,128)):
+    def __init__(self, basepath="/home/dayvidwelles/computer-vision-project/data/Dibco", years=[2009,2010,2011,2012,2013,2014], transform=None, target_transform=None, window_size=(256,256), stride=(128,128), include_augmentation=True):
         data_files = []
         for year in years:
             for subset in self.DIBCO[year]:
                 dibco_imgs_path = "{}/{}/{}_GR/".format(basepath, year, subset)
                 data_files.extend(glob(dibco_imgs_path + "*.png"))
-        
+
+                if include_augmentation:
+                    dibco_imgs_path = dibco_imgs_path.replace("_GR", "_GR_aug")
+                    data_files.extend(glob(dibco_imgs_path + "*.png"))
+
         self.data_files = sorted(data_files)
 
         X_train = []
@@ -51,8 +55,8 @@ class DIBCODataset(Dataset):
             horizontal_padding = int(window_size[1] * np.ceil( float(img_gr_w) / window_size[1] ) - img_gr_w)
             vertical_padding = int(window_size[0] * np.ceil( float(img_gr_h) / window_size[0] ) - img_gr_h)
 
-            img_gr = np.pad(img_gr, ((vertical_padding/2, vertical_padding/2 + vertical_padding%2),(horizontal_padding/2, horizontal_padding/2 + horizontal_padding%2)), mode='constant', constant_values=255)
-            img_gt = np.pad(img_gt, ((vertical_padding/2, vertical_padding/2 + vertical_padding%2),(horizontal_padding/2, horizontal_padding/2 + horizontal_padding%2)), mode='constant', constant_values=255)
+            img_gr = np.pad(img_gr, ((vertical_padding // 2, vertical_padding // 2 + vertical_padding % 2),(horizontal_padding // 2, horizontal_padding // 2 + horizontal_padding % 2)), mode='constant', constant_values=255)
+            img_gt = np.pad(img_gt, ((vertical_padding // 2, vertical_padding // 2 + vertical_padding % 2),(horizontal_padding // 2, horizontal_padding // 2 + horizontal_padding % 2)), mode='constant', constant_values=255)
             
             # sliding window approach, there are three alternatives but only the last one allows specifying the stride
             # img_gr_patches = view_as_blocks(img_gr, window_size).reshape(-1, window_size[0], window_size[1]) 
@@ -179,4 +183,4 @@ if __name__ == '__main__':
             transforms.RandomHorizontalFlip(), transforms.ToTensor()])
     # Call the dataset
     # custom_dataset = MyCustomDataset(..., transformations)
-    data_loader = DIBCODataset(transform=transformations, target_transform=transformations2)
+    data_loader = DIBCODataset(transform=transformations, target_transform=transformations2, include_augmentation=True)
