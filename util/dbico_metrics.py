@@ -40,8 +40,8 @@ def drd_fn(im, im_gt):
 	
 	nubn = 0.
 	block_size = 8
-	for y1 in xrange(0, height, block_size):
-		for x1 in xrange(0, width, block_size):
+	for y1 in range(0, height, block_size):
+		for x1 in range(0, width, block_size):
 			y2 = min(y1+block_size-1,height-1)
 			x2 = min(x1+block_size-1,width-1)
 			block_dim = (x2-x1+1)*(y1-y1+1)
@@ -52,7 +52,7 @@ def drd_fn(im, im_gt):
 
 	drd_sum= 0.
 	tmp = np.zeros(W.shape)
-	for i in xrange(min(1,len(y))):
+	for i in range(min(1,len(y))):
 		tmp[:,:] = 0 
 
 		x1 = max(0, x[i]-n)
