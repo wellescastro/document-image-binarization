@@ -18,7 +18,7 @@ usage:
 import numpy as np 
 import cv2
 # uses https://gist.github.com/pebbie/c2cec958c248339c8537e0b4b90322da for skeletonization
-from bwmorph_thin import bwmorph_thin as bwmorph
+from .bwmorph_thin import bwmorph_thin as bwmorph
 import os.path as path
 import sys
 
@@ -142,10 +142,10 @@ def compute_metrics(im, im_gt):
 
 if __name__=="__main__":
 	if len(sys.argv)<3:
-		print sys.argv[0],"input-image ground-truth-image"
+		print (sys.argv[0],"input-image ground-truth-image")
 		sys.exit(1)
 	if not (path.exists(sys.argv[1]) and path.exists(sys.argv[2])):
-		print "file not found"
+		print ("file not found")
 		sys.exit(1)
 	im = cv2.imread(sys.argv[1],0)
 	im_gt = cv2.imread(sys.argv[2], 0)
@@ -214,4 +214,4 @@ if __name__=="__main__":
 	mpm = (mpfp + mpfn) / 2
 	drd = drd_fn(im, im_gt)
 
-	print "F-measure\t: {0}\npF-measure\t: {1}\nPSNR\t\t: {2}\nNRM\t\t: {3}\nMPM\t\t: {4}\nDRD\t\t: {5}".format(fmeasure, pfmeasure, psnr, nrm, mpm, drd)
+	print ("F-measure\t: {0}\npF-measure\t: {1}\nPSNR\t\t: {2}\nNRM\t\t: {3}\nMPM\t\t: {4}\nDRD\t\t: {5}".format(fmeasure, pfmeasure, psnr, nrm, mpm, drd))

@@ -7,7 +7,7 @@ from skimage.util.shape import view_as_blocks
 import random
 from PIL import Image
 # from util.sliding_window import sliding_window_view
-from sliding_window import sliding_window_view
+from .sliding_window import sliding_window_view
 
 class DIBCODataset(Dataset):
 

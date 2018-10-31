@@ -189,13 +189,13 @@ def main():
             loss.backward()
             optimizer.step()
 
-            training_metrics['loss'] += loss.item()
-            training_metrics['mse'] += mse_score(logits, target)
+            training_metrics['loss'] += loss.data[0]
+            training_metrics['mse'] += mse_score(logits.data, target)
             training_metrics['time'] += (time.time() - t0)
 
             # get thresholded prediction and compute the f1-score per patches
             training_metrics['f1score'] += f2_score(target.view(-1, window_size[0] * window_size[1]), logits.view(-1, window_size[0] * window_size[1]), threshold=threshold).item()
-        
+            print(loss)        
         # get the average training loss
         training_metrics['loss'] /= len(train_loader)
         training_metrics['mse'] /= len(train_loader)
@@ -216,8 +216,8 @@ def main():
                 logits = net.forward(inputs)
                 loss = criterion(logits, target)
 
-                testing_metrics['loss'] += loss.item()
-                testing_metrics['mse'] += mse_score(logits, target)
+                testing_metrics['loss'] += loss.data[0]
+                testing_metrics['mse'] += mse_score(logits.data, target)
                 testing_metrics['time'] += (time.time() - t0)
 
                 # get thresholded prediction and compute the f1-score per patches
