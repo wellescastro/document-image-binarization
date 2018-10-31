@@ -85,7 +85,7 @@ class RandomAffineTransform(object):
 
 def main():
     # Hyperparameters
-    batch_size = 10
+    batch_size = 100
     epochs = 200
     threshold = 0.5
     early_stopping_patience = 20
@@ -189,13 +189,13 @@ def main():
             loss.backward()
             optimizer.step()
 
-            training_metrics['loss'] += loss.data[0]
+            training_metrics['loss'] += loss.item()
             training_metrics['mse'] += mse_score(logits.data, target)
             training_metrics['time'] += (time.time() - t0)
 
             # get thresholded prediction and compute the f1-score per patches
             training_metrics['f1score'] += f2_score(target.view(-1, window_size[0] * window_size[1]), logits.view(-1, window_size[0] * window_size[1]), threshold=threshold).item()
-            print(loss)        
+            
         # get the average training loss
         training_metrics['loss'] /= len(train_loader)
         training_metrics['mse'] /= len(train_loader)
@@ -216,7 +216,7 @@ def main():
                 logits = net.forward(inputs)
                 loss = criterion(logits, target)
 
-                testing_metrics['loss'] += loss.data[0]
+                testing_metrics['loss'] += loss.item()
                 testing_metrics['mse'] += mse_score(logits.data, target)
                 testing_metrics['time'] += (time.time() - t0)
 
@@ -230,18 +230,19 @@ def main():
         testing_metrics['mse'] /= len(test_loader)
         testing_metrics['f1score'] /= len(test_loader)
 
-        print('[%d, %d] train_loss: %.4f test_loss: %.4f train_mse: %.4f test_mse: %.4f train_f1score: %.4f test_f1score: %.4f current patience: %d avg train time: %.2f avg test time: %.2f' %
+        print('[%d, %d] train_loss: %.4f test_loss: %.4f train_mse: %.4f test_mse: %.4f train_f1score: %.4f test_f1score: %.4f current patience: %d avg train time: %.2fs avg test time: %.2fs' %
                     (epoch + 1, epochs, training_metrics['loss'], testing_metrics['loss'], training_metrics['mse'], testing_metrics['mse'], training_metrics['f1score'], testing_metrics['f1score'], 
                     (early_stopper.patience - early_stopper.num_bad_epochs), training_metrics['time'], testing_metrics['time']))
 
         final_evaluation(net, testing_set, testing_transforms, window_size, strides, threshold)
 
-        # save checkpoint
-        is_best = training_metrics['loss'] < early_stopper.best
 
         if early_stopper.step(training_metrics['loss']) == True:
             print("Early stopping triggered!")
             break
+
+        # save checkpoint
+        is_best = training_metrics['loss'] < early_stopper.best
 
         save_checkpoint({
             'epoch': epoch + 1,
@@ -307,8 +308,8 @@ def sliding_window(img, strides, window_size):
     tiles_per_row = int( np.ceil( shape[0] / float(strides[0]) ) )
     tiles_per_col = int( np.ceil( shape[1] / float(strides[1]) ) )
 
-    for i in xrange(tiles_per_row):
-        for j in xrange(tiles_per_col):
+    for i in range(tiles_per_row):
+        for j in range(tiles_per_col):
             i_0 = strides[0]*i
             i_f = i_0 + window_size[0]
 
@@ -337,8 +338,8 @@ def sliding_window_ignore_borders(img, strides, window_size):
     maximum_col = strides[1] * int(np.floor( shape[1] / float(strides[1])))
     shift_col = (img.shape[1] - maximum_col) / 2
 
-    for i in xrange(tiles_per_row):
-        for j in xrange(tiles_per_col):
+    for i in range(tiles_per_row):
+        for j in range(tiles_per_col):
             i_0 = strides[0]*i + shift_row
             i_f = i_0 + window_size[0]
 
