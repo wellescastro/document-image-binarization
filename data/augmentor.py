@@ -32,7 +32,8 @@ def main():
             create_dir(dst_dir_gt)
 
             seq = iaa.Sequential([
-                iaa.Fliplr(0.5), 
+                iaa.Fliplr(0.5),
+                iaa.Flipud(0.5),
                 iaa.Affine(scale={"y": (0.5, 1.5)})
                 ])
 
