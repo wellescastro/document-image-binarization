@@ -102,13 +102,13 @@ class AutoEncoder(nn.Module):
 
         # print("conv_block4", x.shape)
         x = self.conv_block5(x)
-        # residual_5 = layer_5
+        residual_5 = x
 
         # print("conv_block5", x.shape)
 
         # print("---\n")
         # decoding part
-        # x += residual_5
+        x += residual_5
         x = self.deconv_block1(x)
         # print("deconv_block1", x.shape)
         x += residual_4
