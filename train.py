@@ -35,7 +35,7 @@ class ToTensorNoScale(object):
             img = torch.from_numpy(pic.transpose((2, 0, 1)))
             # backward compatibility
             if isinstance(img, torch.ByteTensor):
-                return img.float().div(255)
+                return img.float()
             else:
                 return img
 
@@ -49,7 +49,7 @@ class ToTensorNoScale(object):
         img = img.transpose(0, 1).transpose(0, 2).contiguous()
         
         if isinstance(img, torch.ByteTensor):
-            return img.float().div(255)
+            return img.float()
         return img
 
 class RandomAffineTransform(object):
@@ -85,45 +85,51 @@ class RandomAffineTransform(object):
 
 def main():
     # Hyperparameters
-    batch_size = 100
-    epochs = 200
+    batch_size = 30
+    epochs = 300
     threshold = 0.5
     early_stopping_patience = 20
     window_size = 256,256
     strides = 128,128
 
     # Training informartion
-    start_epoch = 0
     model_weiths_path = "checkpoints/"
     resume_training = False
-    model_name = "auto_encoder3"
-    resume_checkpoint = model_weiths_path + "{}-epoch-12.pth".format(model_name)
+    if resume_training is False:
+        start_epoch = 0
+    else:
+        start_epoch = 154
+    model_name = "auto_encoder_aug5"
+    resume_checkpoint = model_weiths_path + "{}-epoch-154.pth".format(model_name)
 
     use_cuda = torch.cuda.is_available()
 
     # define the model and optimizer
-    net = AutoEncoder(nb_layers=3).cuda()
+    net = AutoEncoder(nb_layers=5).cuda()
     print(net)
     optimizer = optim.Adam(net.parameters(), lr=0.001)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=5)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=5, verbose=True)
   
     # define the dataset and data augmentation operations
     training_transforms = transforms.Compose([
                 # transforms.ToPILImage(mode='L'),
-                # transforms.RandomResizedCrop(window_size[0], scale=(0.08, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2),
+                # # transforms.RandomResizedCrop(window_size[0], scale=(0.08, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2),
                 # transforms.RandomAffine(degrees=0, scale=(0.5,1.5)),
-                # RandomAffineTransform(scale_range=(0.5,1.5),rotation_range=(0,0),shear_range=(0,0), translation_range=(0,0)),
+                # # RandomAffineTransform(scale_range=(0.5,1.5),rotation_range=(0,0),shear_range=(0,0), translation_range=(0,0)),
                 # transforms.RandomHorizontalFlip(),
-                transforms.ToTensor() 
+                transforms.ToTensor(),
+                # transforms.Normalize(mean=[0.5], std=[0.5])
                 ])
 
     training_target_transforms = transforms.Compose([
                 # transforms.ToPILImage(mode='L'),
-                # transforms.RandomResizedCrop(window_size[0], scale=(0.08, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2),
+                # # transforms.RandomResizedCrop(window_size[0], scale=(0.08, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2),
                 # transforms.RandomAffine(degrees=0, scale=(0.5,1.5)),
-                # RandomAffineTransform(scale_range=(0.5,1.5),rotation_range=(0,0),shear_range=(0,0), translation_range=(0,0)),
+                # # RandomAffineTransform(scale_range=(0.5,1.5),rotation_range=(0,0),shear_range=(0,0), translation_range=(0,0)),
                 # transforms.RandomHorizontalFlip(), 
-                transforms.ToTensor()
+                # # ToTensorNoScale(),
+                transforms.ToTensor(),
+                # transforms.Normalize(mean=[0.5], std=[0.5])
                 ])
 
 
@@ -171,9 +177,9 @@ def main():
 
         # perform training
         net.train()
-        t0 = time.time()
+        
         for ind, (inputs, target) in enumerate(train_loader):
-            
+            t0 = time.time()    
             if use_cuda:
                 inputs = inputs.cuda()
                 target = target.cuda()
@@ -189,13 +195,16 @@ def main():
             loss.backward()
             optimizer.step()
 
+            # torch.nn.utils.clip_grad_norm_(net.parameters(), 0.25) # perform gradient clipping
+
             training_metrics['loss'] += loss.item()
             training_metrics['mse'] += mse_score(logits.data, target)
             training_metrics['time'] += (time.time() - t0)
 
             # get thresholded prediction and compute the f1-score per patches
             training_metrics['f1score'] += f2_score(target.view(-1, window_size[0] * window_size[1]), logits.view(-1, window_size[0] * window_size[1]), threshold=threshold).item()
-            
+        
+         
         # get the average training loss
         training_metrics['loss'] /= len(train_loader)
         training_metrics['mse'] /= len(train_loader)
@@ -223,7 +232,7 @@ def main():
                 # get thresholded prediction and compute the f1-score per patches
                 testing_metrics['f1score'] += f2_score(target.view(-1, window_size[0] * window_size[1]), logits.view(-1, window_size[0] * window_size[1]), threshold=threshold).item()
         
-        scheduler.step(training_metrics['loss'])
+        scheduler.step(training_metrics['loss']) # enable reduce learning rate on plateau
 
         # get the average of the metrics
         testing_metrics['loss'] /= len(test_loader)
@@ -239,7 +248,7 @@ def main():
 
         if early_stopper.step(training_metrics['loss']) == True:
             print("Early stopping triggered!")
-            break
+            # break
 
         # save checkpoint
         is_best = training_metrics['loss'] < early_stopper.best
