@@ -79,7 +79,7 @@ class AutoEncoder(nn.Module):
         return nn.Sequential(
             nn.Conv2d(in_f, out_f, *args, **kwargs),
             nn.BatchNorm2d(out_f),
-            nn.ReLU(inplace=True)
+            nn.ReLU()
         )
 
     def forward(self, x):
