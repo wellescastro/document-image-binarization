@@ -14,56 +14,56 @@ class AutoEncoder(nn.Module):
         self.conv_block2 = nn.Sequential(
             nn.Conv2d(in_channels=self.nb_filters, out_channels=self.nb_filters, kernel_size=self.kernel_size, stride=self.stride, padding=2),
             nn.BatchNorm2d(self.nb_filters),
-            nn.ReLU(inplace=True)
+            nn.ReLU()
         )
 
         self.conv_block3 = nn.Sequential(
             nn.Conv2d(in_channels=self.nb_filters, out_channels=self.nb_filters, kernel_size=self.kernel_size, stride=self.stride, padding=2),
             nn.BatchNorm2d(self.nb_filters),
-            nn.ReLU(inplace=True)
+            nn.ReLU()
         )
 
         self.conv_block4 = nn.Sequential(
             nn.Conv2d(in_channels=self.nb_filters, out_channels=self.nb_filters, kernel_size=self.kernel_size, stride=self.stride, padding=2),
             nn.BatchNorm2d(self.nb_filters),
-            nn.ReLU(inplace=True)
+            nn.ReLU()
         )
 
         self.conv_block5 = nn.Sequential(
             nn.Conv2d(in_channels=self.nb_filters, out_channels=self.nb_filters, kernel_size=self.kernel_size, stride=self.stride, padding=2),
             nn.BatchNorm2d(self.nb_filters),
-            nn.ReLU(inplace=True)
+            nn.ReLU()
         )
 
         #decoder
         self.deconv_block1 = nn.Sequential(
             nn.ConvTranspose2d(in_channels=self.nb_filters, out_channels=self.nb_filters, kernel_size=self.kernel_size, stride=self.stride, padding=2, output_padding=1),
             nn.BatchNorm2d(self.nb_filters),
-            nn.ReLU(inplace=True)
+            nn.ReLU()
         )
 
         self.deconv_block2 = nn.Sequential(
             nn.ConvTranspose2d(in_channels=self.nb_filters, out_channels=self.nb_filters, kernel_size=self.kernel_size, stride=self.stride, padding=2, output_padding=1),
             nn.BatchNorm2d(self.nb_filters),
-            nn.ReLU(inplace=True)
+            nn.ReLU()
         )
 
         self.deconv_block3 = nn.Sequential(
             nn.ConvTranspose2d(in_channels=self.nb_filters, out_channels=self.nb_filters, kernel_size=self.kernel_size, stride=self.stride, padding=2, output_padding=1),
             nn.BatchNorm2d(self.nb_filters),
-            nn.ReLU(inplace=True)
+            nn.ReLU()
         )
 
         self.deconv_block4 = nn.Sequential(
             nn.ConvTranspose2d(in_channels=self.nb_filters, out_channels=self.nb_filters, kernel_size=self.kernel_size, stride=self.stride, padding=2, output_padding=1),
             nn.BatchNorm2d(self.nb_filters),
-            nn.ReLU(inplace=True)
+            nn.ReLU()
         )
 
         self.deconv_block5 = nn.Sequential(
             nn.ConvTranspose2d(in_channels=self.nb_filters, out_channels=self.nb_filters, kernel_size=self.kernel_size, stride=self.stride, padding=2, output_padding=1),
             nn.BatchNorm2d(self.nb_filters),
-            nn.ReLU(inplace=True)
+            nn.ReLU()
         )
 
         self.output_layer = nn.Sequential(
