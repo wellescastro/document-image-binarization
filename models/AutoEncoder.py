@@ -86,26 +86,41 @@ class AutoEncoder(nn.Module):
         # encoding part
         # print("input", x.shape)
         x = self.conv_block1(x)
+        residual_1 = x
+
         # print("conv_block1", x.shape)
         x = self.conv_block2(x)
+        residual_2 = x
+
         # print("conv_block2", x.shape)
         x = self.conv_block3(x)
+        residual_3 = x
+
         # print("conv_block3", x.shape)
         x = self.conv_block4(x)
+        residual_4 = x
+
         # print("conv_block4", x.shape)
         x = self.conv_block5(x)
+        # residual_5 = layer_5
+
         # print("conv_block5", x.shape)
 
         # print("---\n")
         # decoding part
+        # x += residual_5
         x = self.deconv_block1(x)
         # print("deconv_block1", x.shape)
+        x += residual_4
         x = self.deconv_block2(x)
         # print("deconv_block2", x.shape)
+        x += residual_3
         x = self.deconv_block3(x)
         # print("deconv_block3", x.shape)
+        x += residual_2
         x = self.deconv_block4(x)
         # print("deconv_block4", x.shape)
+        x += residual_1
         x = self.deconv_block5(x)
         # print("deconv_block5", x.shape)
 
