@@ -38,7 +38,7 @@ class DIBCODataset(Dataset):
         Y_train = []
         list_of_patches = []
 
-        for filename_gr in self.data_files[1:]:
+        for filename_gr in self.data_files:
             filename_gt = filename_gr.replace("GR", "GT")
                            
             img_gr = cv2.imread(filename_gr, cv2.IMREAD_GRAYSCALE)
