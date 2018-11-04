@@ -24,7 +24,7 @@ class AutoEncoder(nn.Module):
         self.deconv_block5 = self.deconv_block(in_f=self.nb_filters, out_f=self.nb_filters, kernel_size=self.kernel_size, stride=self.stride, padding=self.padding, output_padding=1)
 
         self.output_layer = nn.Sequential(
-            nn.Conv2d(self.nb_filters, 1, kernel_size=self.kernel_size, stride=1, padding=self.padding=),
+            nn.Conv2d(self.nb_filters, 1, kernel_size=self.kernel_size, stride=1, padding=self.padding),
             nn.Sigmoid()
         )
 
