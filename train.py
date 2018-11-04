@@ -20,68 +20,10 @@ from util.dbico_metrics import compute_metrics
 from skimage.transform import warp, AffineTransform
 import time
 
-
 def criterion(logits, labels):
     return losses.F1ScoreLoss().forward(logits, labels)
     # return losses.BinaryCrossEntropyLoss2d().forward(logits, labels)
     # return losses.SoftDiceLoss().forward(logits, labels)
-
-class ToTensorNoScale(object):
-    def __init__(self):
-        pass
-    def __call__(self, pic):
-        if isinstance(pic, np.ndarray):
-            # handle numpy array
-            img = torch.from_numpy(pic.transpose((2, 0, 1)))
-            # backward compatibility
-            if isinstance(img, torch.ByteTensor):
-                return img.float()
-            else:
-                return img
-
-        # handle PIL Image
-        img = torch.from_numpy(np.array(pic, np.uint8, copy=False))
-        
-        nchannel = len(pic.mode)
-        img = img.view(pic.size[1], pic.size[0], nchannel)
-        # put it from HWC to CHW format
-        # yikes, this transpose takes 80% of the loading time/CPU
-        img = img.transpose(0, 1).transpose(0, 2).contiguous()
-        
-        if isinstance(img, torch.ByteTensor):
-            return img.float()
-        return img
-
-class RandomAffineTransform(object):
-    def __init__(self,
-                 scale_range,
-                 rotation_range,
-                 shear_range,
-                 translation_range
-                 ):
-        self.scale_range = scale_range
-        self.rotation_range = rotation_range
-        self.shear_range = shear_range
-        self.translation_range = translation_range
-
-    def __call__(self, img):
-        img_data = np.array(img)
-        h, w, n_chan = img_data.shape
-        scale_x = np.random.uniform(*self.scale_range)
-        scale_y = np.random.uniform(*self.scale_range)
-        scale = (scale_x, scale_y)
-        # rotation = np.random.uniform(*self.rotation_range)
-        # shear = np.random.uniform(*self.shear_range)
-        # translation = (
-        #     np.random.uniform(*self.translation_range) * w,
-        #     np.random.uniform(*self.translation_range) * h
-        # )
-        # af = AffineTransform(scale=scale, shear=shear, rotation=rotation, translation=translation)
-        af = AffineTransform(scale=scale)
-        img_data1 = warp(img_data, af.inverse)
-        img_data1 = np.squeeze(img_data1, axis=2)
-        img1 = Image.fromarray(np.uint8(img_data1 * 255))
-        return img1
 
 def main():
     # Hyperparameters
@@ -324,44 +266,6 @@ def sliding_window(img, strides, window_size):
 
             j_0 = strides[1]*j
             j_f = j_0 + window_size[1]
-
-            # if i_f > shape[1]:
-            #     i_f = shape[1] - 1
-            #     i_0 = i_f - window_size[0]
-
-            # if j_f > shape[0]:
-            #     j_f = shape[0] - 1
-            #     j_0 = j_f - window_size[1]
-            
-            yield (i_0,i_f, j_0,j_f), img[i_0:i_f, j_0:j_f]
-
-
-def sliding_window_ignore_borders(img, strides, window_size):
-    shape = img.shape
-    tiles_per_row = int( np.ceil( shape[0] / float(strides[0]) ) )
-    tiles_per_col = int( np.ceil( shape[1] / float(strides[1]) ) )
-
-    maximum_row = strides[0] * int(np.floor( shape[0] / float(strides[0])))
-    shift_row = (img.shape[0] - maximum_row) / 2
-
-    maximum_col = strides[1] * int(np.floor( shape[1] / float(strides[1])))
-    shift_col = (img.shape[1] - maximum_col) / 2
-
-    for i in range(tiles_per_row):
-        for j in range(tiles_per_col):
-            i_0 = strides[0]*i + shift_row
-            i_f = i_0 + window_size[0]
-
-            j_0 = strides[1]*j + shift_col
-            j_f = j_0 + window_size[1]
-
-            # if i_f > shape[1]:
-            #     i_f = shape[1] - 1
-            #     i_0 = i_f - window_size[0]
-
-            # if j_f > shape[0]:
-            #     j_f = shape[0] - 1
-            #     j_0 = j_f - window_size[1]
             
             yield (i_0,i_f, j_0,j_f), img[i_0:i_f, j_0:j_f]
 
