@@ -20,6 +20,7 @@ def paper_f1score(logits, targets, beta, eps=1e-9):
     bot = beta2 * targets.sum(dim=1) + logits.sum(dim=1).add(eps)
     return torch.mean((1.0 + beta2) * top / bot)
 
+
 def fbeta_score(y_true, y_pred, beta, threshold, eps=1e-9):
     beta2 = beta**2
 
