@@ -26,12 +26,12 @@ class F1ScoreLoss(nn.Module):
         # logits_flat = logits.view(logits.shape[0], -1)
         # targets_flat = targets.view(targets.shape[0], -1)
         # logits = torch.ge(logits.float(), 0.5).float() # enable true f1-score 
-        dim = 1
+        dim = 0
         beta = 1.0
         beta2 = beta ** 2.0
-        top = torch.mul(targets, logits).sum(dim=0).add(eps)
+        top = torch.mul(targets, logits).sum(dim=dim).add(eps)
 
-        bot = beta2 * targets.sum(dim=0) + logits.sum(dim=0).add(eps)
+        bot = beta2 * targets.sum(dim=dim) + logits.sum(dim=dim).add(eps)
         result = torch.mean(1 - ((1.0 + beta2) * top / bot))
         return result
         

@@ -128,7 +128,7 @@ class DIBCODataset(Dataset):
         if self.target_transform is not None:
             img_gt = self.target_transform(img_gt)
         
-        # sanity check of the transforms
+        # # sanity check of the transforms
         # a = img_gr.numpy()*255
         # a = np.transpose(a, (1,2,0)).astype(np.uint8)
         # a = np.squeeze(a)
@@ -138,7 +138,6 @@ class DIBCODataset(Dataset):
         # b = np.transpose(b, (1,2,0)).astype(np.uint8)
         # b = np.squeeze(b)
         # Image.fromarray(b).show()
-
         # exit()
 
         return (img_gr, img_gt)
