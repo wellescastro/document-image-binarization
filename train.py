@@ -5,29 +5,59 @@ import math
 import torch
 import torch.optim as optim
 from torch.autograd import Variable
+from sklearn import metrics as sk_metrics
 from torch.utils.data import DataLoader
+import torch.nn as nn
 from util.DIBCOReader import DIBCODataset
 from torchvision import transforms
 from models.AutoEncoder import AutoEncoder
-from models import losses
+from util import losses
 from EarlyStopping import EarlyStopping
-from metrics import f2_score, mse_score
+from util.metrics import f_score, mse_score, f_score_no_threshold
 from util.utils import save_checkpoint, load_checkpoint, load_weights
 from skimage.util.shape import view_as_blocks
 from PIL import Image
+from sklearn.preprocessing import MinMaxScaler
 from util.sliding_window import sliding_window_view
 from util.dbico_metrics import compute_metrics
 from skimage.transform import warp, AffineTransform
 import time
+import torch.backends.cudnn as cudnn
+from loss import LossBinary
 
 def criterion(logits, labels):
+    # return losses.FBeta_ScoreLoss().forward(logits, labels)
     return losses.F1ScoreLoss().forward(logits, labels)
-    # return losses.BinaryCrossEntropyLoss2d().forward(logits, labels)
-    # return losses.SoftDiceLoss().forward(logits, labels)
+
+class ToTensorNoScale(object):
+    def __init__(self):
+        pass
+    def __call__(self, pic):
+        if isinstance(pic, np.ndarray):
+            # handle numpy array
+            img = torch.from_numpy(pic.transpose((2, 0, 1)))
+            # backward compatibility
+            if isinstance(img, torch.ByteTensor):
+                return img.float()
+            else:
+                return img
+
+        # handle PIL Image
+        img = torch.from_numpy(np.array(pic, np.uint8, copy=False))
+        
+        nchannel = len(pic.mode)
+        img = img.view(pic.size[1], pic.size[0], nchannel)
+        # put it from HWC to CHW format
+        # yikes, this transpose takes 80% of the loading time/CPU
+        img = img.transpose(0, 1).transpose(0, 2).contiguous()
+        
+        if isinstance(img, torch.ByteTensor):
+            return img.float()
+        return img
 
 def main():
     # Hyperparameters
-    batch_size = 30
+    batch_size = 25
     epochs = 300
     threshold = 0.5
     early_stopping_patience = 20
@@ -40,9 +70,9 @@ def main():
     if resume_training is False:
         start_epoch = 0
     else:
-        start_epoch = 154
-    model_name = "auto_encoder_aug5"
-    resume_checkpoint = model_weiths_path + "{}-epoch-154.pth".format(model_name)
+        start_epoch = 10
+    model_name = "auto_encoder_flip"
+    resume_checkpoint = model_weiths_path + "{}-epoch-{}.pth".format(model_name, start_epoch)
 
     use_cuda = torch.cuda.is_available()
 
@@ -50,7 +80,7 @@ def main():
     net = AutoEncoder(nb_layers=5).cuda()
     print(net)
     optimizer = optim.Adam(net.parameters(), lr=0.001)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=5, verbose=True)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=20, verbose=True)
   
     # define the dataset and data augmentation operations
     training_transforms = transforms.Compose([
@@ -58,8 +88,10 @@ def main():
                 # # transforms.RandomResizedCrop(window_size[0], scale=(0.08, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2),
                 # transforms.RandomAffine(degrees=0, scale=(0.5,1.5)),
                 # # RandomAffineTransform(scale_range=(0.5,1.5),rotation_range=(0,0),shear_range=(0,0), translation_range=(0,0)),
-                # transforms.RandomHorizontalFlip(),
-                transforms.ToTensor(),
+                # transforms.RandomHorizontalFlip(p=0.25),
+                # transforms.RandomVerticalFlip(p=0.25),
+                # ToTensorNoScale(),
+                transforms.ToTensor()
                 # transforms.Normalize(mean=[0.5], std=[0.5])
                 ])
 
@@ -68,19 +100,22 @@ def main():
                 # # transforms.RandomResizedCrop(window_size[0], scale=(0.08, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2),
                 # transforms.RandomAffine(degrees=0, scale=(0.5,1.5)),
                 # # RandomAffineTransform(scale_range=(0.5,1.5),rotation_range=(0,0),shear_range=(0,0), translation_range=(0,0)),
-                # transforms.RandomHorizontalFlip(), 
+                # transforms.RandomHorizontalFlip(p=0.25), 
+                # transforms.RandomVerticalFlip(p=0.25),
                 # # ToTensorNoScale(),
                 transforms.ToTensor(),
                 # transforms.Normalize(mean=[0.5], std=[0.5])
                 ])
 
 
-    training_set = DIBCODataset(years=[2009,2010,2011,2012,2013,2014],
-    transform = training_transforms, target_transform=training_transforms, window_size=window_size, stride=strides, include_augmentation=True
+    training_set = DIBCODataset(years=[2009, 2010, 2011, 2012, 2013, 2014],
+    transform = training_transforms, target_transform=training_target_transforms, window_size=window_size, stride=strides, include_augmentation=True
     )
 
     testing_transforms = transforms.Compose([ 
-        transforms.ToTensor()])
+        # ToTensorNoScale(),
+        transforms.ToTensor()
+        ])
 
     testing_target_transforms = transforms.Compose([
         transforms.ToTensor()
@@ -108,19 +143,20 @@ def main():
           .format(len(train_loader.dataset), len(test_loader.dataset)))
 
     early_stopper = EarlyStopping(mode='min', patience=early_stopping_patience)
-    
+
     # optionally resume from a checkpoint
     if resume_training:
         start_epoch, early_stopper.best, early_stopper.num_bad_epochs = load_checkpoint(net, optimizer, resume_checkpoint)
-
+    cudnn.benchmark = True
+        
     for epoch in range(start_epoch, epochs):
         training_metrics = {'loss':0, 'mse':0, 'f1score':0, 'time': 0}
         testing_metrics = {'loss':0, 'mse':0, 'f1score':0, 'time': 0}
 
         # perform training
         net.train()
-        
         for ind, (inputs, target) in enumerate(train_loader):
+            
             t0 = time.time()    
             if use_cuda:
                 inputs = inputs.cuda()
@@ -130,49 +166,48 @@ def main():
 
             # forward
             logits = net.forward(inputs)
-            loss = criterion(logits, target)
+            loss = criterion(logits.view(-1), target.view(-1))
 
             # backward + optimize
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-            # torch.nn.utils.clip_grad_norm_(net.parameters(), 0.25) # perform gradient clipping
+            # # torch.nn.utils.clip_grad_norm_(net.parameters(), 0.25) # perform gradient clipping
 
             training_metrics['loss'] += loss.item()
-            training_metrics['mse'] += mse_score(logits.data, target)
+            # training_metrics['mse'] += mse_score(logits.data, target)
             training_metrics['time'] += (time.time() - t0)
 
-            # get thresholded prediction and compute the f1-score per patches
-            training_metrics['f1score'] += f2_score(target.view(-1, window_size[0] * window_size[1]), logits.view(-1, window_size[0] * window_size[1]), threshold=threshold).item()
-        
-         
+            # # get thresholded prediction and compute the f1-score per patches
+            training_metrics['f1score'] += f_score_no_threshold(target.view(-1, 256*256), logits.view(-1, 256*256), threshold=threshold).item()
+    
         # get the average training loss
         training_metrics['loss'] /= len(train_loader)
         training_metrics['mse'] /= len(train_loader)
         training_metrics['f1score'] /= len(train_loader)
         
-        # perform validation 
-        net.eval()
-        t0 = time.time()
-        with torch.no_grad():
-            for ind, (inputs, target) in enumerate(test_loader):
-                if use_cuda:
-                    inputs = inputs.cuda()
-                    target = target.cuda()
+        # # perform validation 
+        # net.eval()
+        # with torch.no_grad():
+        #     for ind, (inputs, target) in enumerate(test_loader):
+        #         t0 = time.time()
+        #         if use_cuda:
+        #             inputs = inputs.cuda()
+        #             target = target.cuda()
 
-                inputs, target = Variable(inputs), Variable(target)
+        #         inputs, target = Variable(inputs), Variable(target)
 
-                # forward
-                logits = net.forward(inputs)
-                loss = criterion(logits, target)
+        #         # forward
+        #         logits = net.forward(inputs)
+        #         loss = losses.BinaryCrossEntropyLoss2d().forward(logits, target)
 
-                testing_metrics['loss'] += loss.item()
-                testing_metrics['mse'] += mse_score(logits.data, target)
-                testing_metrics['time'] += (time.time() - t0)
+        #         testing_metrics['loss'] += loss.item()
+        #         testing_metrics['mse'] += mse_score(logits.data, target)
+        #         testing_metrics['time'] += (time.time() - t0)
 
-                # get thresholded prediction and compute the f1-score per patches
-                testing_metrics['f1score'] += f2_score(target.view(-1, window_size[0] * window_size[1]), logits.view(-1, window_size[0] * window_size[1]), threshold=threshold).item()
+        #         # get thresholded prediction and compute the f1-score per patches
+        #         testing_metrics['f1score'] += f_score(target.view(-1, window_size[0] * window_size[1]), logits.view(-1, window_size[0] * window_size[1]), threshold=threshold).item()
         
         scheduler.step(training_metrics['loss']) # enable reduce learning rate on plateau
 
@@ -181,20 +216,19 @@ def main():
         testing_metrics['mse'] /= len(test_loader)
         testing_metrics['f1score'] /= len(test_loader)
 
-        print('[%d, %d] train_loss: %.4f test_loss: %.4f train_mse: %.4f test_mse: %.4f train_f1score: %.4f test_f1score: %.4f current patience: %d avg train time: %.2fs avg test time: %.2fs' %
-                    (epoch + 1, epochs, training_metrics['loss'], testing_metrics['loss'], training_metrics['mse'], testing_metrics['mse'], training_metrics['f1score'], testing_metrics['f1score'], 
-                    (early_stopper.patience - early_stopper.num_bad_epochs), training_metrics['time'], testing_metrics['time']))
+        test_f1score = final_evaluation(net, testing_set, testing_transforms, window_size, strides, threshold)
+        print('Epoch %d/%d train_loss: %.4f train_f1score: %.4f current patience: %d avg train time: %.2fs test fscore: %.4f' %
+                    (epoch + 1, epochs, training_metrics['loss'], training_metrics['f1score'], 
+                    (early_stopper.patience - early_stopper.num_bad_epochs), training_metrics['time'], test_f1score))
 
-        final_evaluation(net, testing_set, testing_transforms, window_size, strides, threshold)
-
-
+        
         if early_stopper.step(training_metrics['loss']) == True:
             print("Early stopping triggered!")
-            # break
+            break
 
         # save checkpoint
-        is_best = training_metrics['loss'] < early_stopper.best
-
+        is_best = training_metrics['loss'] == early_stopper.best
+ 
         save_checkpoint({
             'epoch': epoch + 1,
             'state_dict': net.state_dict(),
@@ -211,10 +245,13 @@ def main():
     #         transforms.Lambda(lambda cv2img:torch.from_numpy(cv2img).float().to('cuda'))])
 
     # starting final evaluation using the reconstructed image
-    final_evaluation(net, testing_set, testing_transforms, window_size, strides, threshold)
+    print(final_evaluation(net, testing_set, testing_transforms, window_size, strides, threshold))
 
 def final_evaluation(net, testing_set, testing_transforms, window_size, strides, threshold):
     fmeasures = []
+    sk_fmeasures = []
+    scaler = MinMaxScaler(feature_range=(0,255))
+    net.eval()
     with torch.no_grad():
         for filename_gr in testing_set.data_files:
             filename_gt = filename_gr.replace("GR", "GT")
@@ -239,19 +276,21 @@ def final_evaluation(net, testing_set, testing_transforms, window_size, strides,
 
                 # forward
                 logits = net(inputs)
-                pred = (logits > threshold).float() # threshold the output activation map
+                pred = (logits > 0).float() # threshold the output activation map
                 pred = logits.squeeze() # remove all dimensions of size 1 (batch dimension and channel dimension)
-
+                
                 prediction_unpadded = pred[0:window_size[0]-vertical_padding, 0:window_size[1]-horizontal_padding]
                 img_prediction[coords[0]:coords[1],coords[2]:coords[3]] = prediction_unpadded
                 
-            img_prediction *= 255
+            img_prediction = 255 * img_prediction
             img_prediction = 255 - img_prediction
-
-            fmeasure, pfmeasure, psnr, nrm, mpm, drd = compute_metrics(img_prediction, img_gt)
+            
+            fmeasure, pfmeasure, psnr, nrm, mpm, drd = compute_metrics(img_prediction.copy(), img_gt.copy())
             fmeasures.append(fmeasure)
+
+            sk_fmeasures.append(sk_metrics.fbeta_score( ((255 - img_gt.ravel()) / 255), ((255 - img_prediction.ravel()) / 255), 1))
         
-        print("final fmeasures", np.mean(fmeasures))
+        return np.mean(fmeasures)
         
 
 def sliding_window(img, strides, window_size):
