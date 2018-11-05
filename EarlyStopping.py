@@ -1,6 +1,6 @@
 import numpy as np
 class EarlyStopping(object):
-    def __init__(self, mode='min', min_delta=0, patience=10):
+    def __init__(self, mode='min', min_delta=0, patience=20):
         self.mode = mode
         self.min_delta = min_delta
         self.patience = patience
