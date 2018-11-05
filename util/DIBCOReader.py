@@ -6,6 +6,7 @@ import numpy as np
 from skimage.util.shape import view_as_blocks
 import random
 from PIL import Image
+import torch
 # from util.sliding_window import sliding_window_view
 from .sliding_window import sliding_window_view
 
@@ -101,7 +102,7 @@ class DIBCODataset(Dataset):
         self.X_train = X_train
         self.Y_train = Y_train
         self.transform = transform
-        self.target_transform = transform
+        self.target_transform = target_transform
         self.list_of_patches = list_of_patches
     
 
@@ -119,6 +120,9 @@ class DIBCODataset(Dataset):
         random.seed(seed) # apply this seed to img tranfsorms
         if self.transform is not None:
             img_gr = self.transform(img_gr)
+        else:
+            img_gr = np.transpose(img_gr, axes=(2, 0, 1))
+            img_gr = torch.from_numpy(img_gr).float()
         
         random.seed(seed) # apply this seed to target tranfsorms
         if self.target_transform is not None:

@@ -111,6 +111,10 @@ def compute_metrics(im, im_gt):
 	fn[(im==1) & (im_gt==0)] = 1
 	numfn = fn.sum()
 
+	numtp += 1e-9
+	numfp += 1e-9
+	numfn += 1e-9
+
 	precision = numtp / (numtp + numfp)
 	recall = numtp / (numtp + numfn)
 	precall = numptp / np.sum(1-im_sk)
