@@ -262,8 +262,7 @@ for fname_x in array_images:
     for k in arr_x.keys():
         if k=='o':
             continue
-        cv2.imwrite(fullname_x + '_' + k + ".png", arr_x[k])
-        cv2.imwrite(fullname_y + '_' + k + ".png", arr_y[k])
-
+        cv2.imwrite(fullname_x + '_' + k + ".png", arr_x[k], [cv2.IMWRITE_PNG_COMPRESSION,0])
+        cv2.imwrite(fullname_y + '_' + k + ".png", arr_y[k], [cv2.IMWRITE_PNG_COMPRESSION,0])
 
 
