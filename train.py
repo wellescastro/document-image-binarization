@@ -26,8 +26,8 @@ import torch.backends.cudnn as cudnn
 from loss import LossBinary
 
 def criterion(logits, labels):
-    # return losses.FBeta_ScoreLoss().forward(logits, labels)
-    return losses.F1ScoreLoss().forward(logits, labels)
+    return losses.FBeta_ScoreLoss().forward(logits, labels)
+    # return losses.F1ScoreLoss().forward(logits, labels)
 
 class ToTensorNoScale(object):
     def __init__(self):
@@ -55,10 +55,16 @@ class ToTensorNoScale(object):
             return img.float()
         return img
 
+def weights_init(m):
+    classname = m.__class__.__name__
+    if classname.find('Conv') != -1:
+        nn.init.xavier_uniform_(m.weight.data) # kernel_initializer
+        nn.init.zeros_(m.bias.data) # bias initializer
+
 def main():
     # Hyperparameters
     batch_size = 25
-    epochs = 300
+    epochs = 200
     threshold = 0.5
     early_stopping_patience = 20
     window_size = 256,256
@@ -70,18 +76,21 @@ def main():
     if resume_training is False:
         start_epoch = 0
     else:
-        start_epoch = 10
-    model_name = "auto_encoder_flip"
+        start_epoch = 33
+    model_name = "auto_encoder_trial_01"
     resume_checkpoint = model_weiths_path + "{}-epoch-{}.pth".format(model_name, start_epoch)
 
     use_cuda = torch.cuda.is_available()
 
     # define the model and optimizer
     net = AutoEncoder(nb_layers=5).cuda()
+    net.apply(weights_init)
     print(net)
-    optimizer = optim.Adam(net.parameters(), lr=0.001)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=20, verbose=True)
-  
+    optimizer = optim.Adam(net.parameters(), lr=0.01)
+    # optimizer = optim.SGD(net.parameters(), lr=0.01, momentum=0.9, nesterov=True, weight_decay=1e-6)
+    # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=20, verbose=True)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, 30, gamma=0.5, last_epoch=-1)
+
     # define the dataset and data augmentation operations
     training_transforms = transforms.Compose([
                 # transforms.ToPILImage(mode='L'),
@@ -144,14 +153,21 @@ def main():
 
     early_stopper = EarlyStopping(mode='min', patience=early_stopping_patience)
 
-    # optionally resume from a checkpoint
+    # # optionally resume from a checkpoint
     if resume_training:
-        start_epoch, early_stopper.best, early_stopper.num_bad_epochs = load_checkpoint(net, optimizer, resume_checkpoint)
+        start_epoch, early_stopper.best, early_stopper.num_bad_epochs = load_checkpoint(net, optimizer, scheduler, resume_checkpoint)
+
     cudnn.benchmark = True
-        
+
+    # # change learning rate manually, just to check if its getting into local minima
+    # for param_group in optimizer.param_groups:
+    #          param_group['lr'] = 0.0001
+
     for epoch in range(start_epoch, epochs):
         training_metrics = {'loss':0, 'mse':0, 'f1score':0, 'time': 0}
         testing_metrics = {'loss':0, 'mse':0, 'f1score':0, 'time': 0}
+
+        # scheduler.step() # enable learning rate decay every 30 epochs
 
         # perform training
         net.train()
@@ -166,7 +182,7 @@ def main():
 
             # forward
             logits = net.forward(inputs)
-            loss = criterion(logits.view(-1), target.view(-1))
+            loss = criterion(logits.view(-1, 256*256), target.view(-1, 256*256))
 
             # backward + optimize
             optimizer.zero_grad()
@@ -209,7 +225,7 @@ def main():
         #         # get thresholded prediction and compute the f1-score per patches
         #         testing_metrics['f1score'] += f_score(target.view(-1, window_size[0] * window_size[1]), logits.view(-1, window_size[0] * window_size[1]), threshold=threshold).item()
         
-        scheduler.step(training_metrics['loss']) # enable reduce learning rate on plateau
+        # scheduler.step(training_metrics['loss']) # enable reduce learning rate on plateau
 
         # get the average of the metrics
         testing_metrics['loss'] /= len(test_loader)
@@ -235,6 +251,7 @@ def main():
             'best_training_loss': early_stopper.best,
             'num_bad_epochs': early_stopper.num_bad_epochs,
             'optimizer' : optimizer.state_dict(),
+            'scheduler' : scheduler.state_dict(),
         }, is_best, model_weiths_path, model_name)
     
 
@@ -276,7 +293,7 @@ def final_evaluation(net, testing_set, testing_transforms, window_size, strides,
 
                 # forward
                 logits = net(inputs)
-                pred = (logits > 0).float() # threshold the output activation map
+                pred = (logits > 0.5).float() # threshold the output activation map
                 pred = logits.squeeze() # remove all dimensions of size 1 (batch dimension and channel dimension)
                 
                 prediction_unpadded = pred[0:window_size[0]-vertical_padding, 0:window_size[1]-horizontal_padding]
@@ -288,7 +305,7 @@ def final_evaluation(net, testing_set, testing_transforms, window_size, strides,
             fmeasure, pfmeasure, psnr, nrm, mpm, drd = compute_metrics(img_prediction.copy(), img_gt.copy())
             fmeasures.append(fmeasure)
 
-            sk_fmeasures.append(sk_metrics.fbeta_score( ((255 - img_gt.ravel()) / 255), ((255 - img_prediction.ravel()) / 255), 1))
+            # sk_fmeasures.append(sk_metrics.fbeta_score( ((255 - img_gt.ravel()) / 255), ((255 - img_prediction.ravel()) / 255), 1))
         
         return np.mean(fmeasures)
         

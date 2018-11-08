@@ -9,6 +9,7 @@ class F1ScoreLoss(nn.Module):
     dim=0 and logits_shape=(-1) calcula o fscore com base em um flat de todo o batch sem considerar o calculo por amostra
     dim=1 and logits_shape=(-1, 1, 256, 256) calcula o f1score pra cada patch e depois tira a media de scores
     dim=1 and logits_shape=(-1, 256 * 256) calcula o f1score pra cada flatted patch (parece a opcao mais razoavel)
+    dim=None and logits_shape=(-1, 256 * 256) calcula o micro f1 (across the classes instead of f1 for each class )
 
     reduction (string, optional): Specifies the reduction to apply to the output:
             'none' | 'elementwise_mean' | 'sum'. 'none': no reduction will be applied,
@@ -26,12 +27,11 @@ class F1ScoreLoss(nn.Module):
         # logits_flat = logits.view(logits.shape[0], -1)
         # targets_flat = targets.view(targets.shape[0], -1)
         # logits = torch.ge(logits.float(), 0.5).float() # enable true f1-score 
-        dim = 0
         beta = 1.0
         beta2 = beta ** 2.0
-        top = torch.mul(targets, logits).sum(dim=dim).add(eps)
-
-        bot = beta2 * targets.sum(dim=dim) + logits.sum(dim=dim).add(eps)
+        top = torch.mul(targets, logits).sum().add(eps)
+        bot = beta2 * targets.sum() + logits.sum().add(eps)
+        f1 = ((1.0 + beta2) * top / bot)
         result = torch.mean(1 - ((1.0 + beta2) * top / bot))
         return result
         
@@ -56,14 +56,11 @@ class FBeta_ScoreLoss(nn.Module):
         y_pred = y_pred.float()
         y_true = y_true.float()
 
-        true_positive = (y_pred * y_true).sum(dim=1)
-        precision = true_positive.div(y_pred.sum(dim=1).add(eps))
-        recall = true_positive.div(y_true.sum(dim=1).add(eps))
+        true_positive = (y_pred * y_true).sum()
+        precision = true_positive.div(y_pred.sum().add(eps))
+        recall = true_positive.div(y_true.sum().add(eps))
 
-        return torch.mean(
-            (precision*recall).
-            div(precision.mul(beta2) + recall + eps).
-            mul(1 + beta2))
+        return (precision*recall).div(precision.mul(beta2) + recall + eps).mul(1 + beta2)
 
     def fbeta_score(self, y_true, y_pred, beta, eps=1e-9):
         beta2 = beta**2
@@ -71,9 +68,9 @@ class FBeta_ScoreLoss(nn.Module):
         y_pred = torch.ge(y_pred.float(), self.threshold).float()
         y_true = y_true.float()
 
-        true_positive = (y_pred * y_true).sum(dim=1)
-        precision = true_positive.div(y_pred.sum(dim=1).add(eps))
-        recall = true_positive.div(y_true.sum(dim=1).add(eps))
+        true_positive = (y_pred * y_true).sum()
+        precision = true_positive.div(y_pred.sum().add(eps))
+        recall = true_positive.div(y_true.sum().add(eps))
 
         return torch.mean(
             (precision*recall).
@@ -81,7 +78,7 @@ class FBeta_ScoreLoss(nn.Module):
             mul(1 + beta2))
 
     def forward(self, logits, targets):
-        return (1 - self.fbeta_score(logits, targets, self.beta))
+        return (1 - self.fbeta_score_no_threshold(logits, targets, self.beta))
 
 
 class BinaryCrossEntropyLoss2d(nn.Module):

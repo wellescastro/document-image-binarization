@@ -10,7 +10,7 @@ def save_checkpoint(state, is_best, checkpoint_dir, model_name):
         shutil.copyfile(filename, checkpoint_dir + 'model_best.pth')
 
 # TODO: built the checkpoint loading, here's a helper
-def load_checkpoint(model, optimizer, load_path):
+def load_checkpoint(model, optimizer, scheduler, load_path):
     """ loads state into model and optimizer and returns:
         epoch, best_precision, loss_train[]
     """
@@ -22,6 +22,7 @@ def load_checkpoint(model, optimizer, load_path):
         num_bad_epochs = checkpoint['num_bad_epochs']
         model.load_state_dict(checkpoint['state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer'])
+        scheduler.load_state_dict(checkpoint['scheduler'])
         print("=> loaded checkpoint '{}' (epoch {})"
               .format(epoch, checkpoint['epoch']))
         return epoch, best_training_loss, num_bad_epochs

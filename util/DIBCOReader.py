@@ -31,7 +31,7 @@ class DIBCODataset(Dataset):
 
                 if include_augmentation:
                     dibco_imgs_path = dibco_imgs_path.replace("_GR", "_GR_aug")
-                    data_files.extend(glob(dibco_imgs_path + "*.png"))
+                    data_files.extend(glob(dibco_imgs_path + "*_o_zo.png"))
 
         self.data_files = sorted(data_files)
 
