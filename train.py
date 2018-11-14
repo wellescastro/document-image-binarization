@@ -160,9 +160,9 @@ def main():
 
     cudnn.benchmark = True
 
-    # change learning rate manually, just to check if its getting into local minima
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = param_group['lr'] * 0.5
+    # # change learning rate manually, just to check if its getting into local minima
+    # for param_group in optimizer.param_groups:
+    #     param_group['lr'] = param_group['lr'] * 0.5
 
     for epoch in range(start_epoch, epochs):
         training_metrics = {'loss':0, 'mse':0, 'f1score':0, 'time': 0}
