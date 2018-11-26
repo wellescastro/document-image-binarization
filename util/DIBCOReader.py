@@ -3,6 +3,7 @@ from torchvision import transforms
 from glob import glob
 import cv2
 import numpy as np
+from random import shuffle
 from skimage.util.shape import view_as_blocks
 import random
 from PIL import Image
@@ -23,17 +24,18 @@ class DIBCODataset(Dataset):
     }
 
     def __init__(self, basepath="data/Dibco", years=[2009,2010,2011,2012,2013,2014], transform=None, target_transform=None, window_size=(256,256), stride=(128,128), include_augmentation=True):
-        data_files = []
+        self.data_files = []
         for year in years:
             for subset in self.DIBCO[year]:
                 dibco_imgs_path = "{}/{}/{}_GR/".format(basepath, year, subset)
-                data_files.extend(glob(dibco_imgs_path + "*.png"))
+                self.data_files.extend(glob(dibco_imgs_path + "*.png"))
 
                 if include_augmentation:
                     dibco_imgs_path = dibco_imgs_path.replace("_GR", "_GR_aug")
-                    data_files.extend(glob(dibco_imgs_path + "*_o_zo.png"))
+                    self.data_files.extend(glob(dibco_imgs_path + "*.png"))
 
-        self.data_files = sorted(data_files)
+        # self.data_files = sorted(data_files)
+        shuffle(self.data_files)
 
         X_train = []
         Y_train = []
@@ -51,6 +53,9 @@ class DIBCODataset(Dataset):
             # new_gr_h, new_gr_w = int( window_size[0] * round( float(img_gr_h) / window_size[0] )), int( window_size[1] * round( float(img_gr_w) / window_size[1] ))
             # img_gr = cv2.resize(img_gr, (new_gr_w, new_gr_h), interpolation = cv2.INTER_CUBIC)
             # img_gt = cv2.resize(img_gt, (new_gr_w, new_gr_h), interpolation = cv2.INTER_CUBIC)
+
+            # TODO: implement the skip window approach
+            # TODO: implement a crop approach based on the minimum divisible number by the window size
             
             # apply padding instead of resizing to avoid losing significant information
             horizontal_padding = int(window_size[1] * np.ceil( float(img_gr_w) / window_size[1] ) - img_gr_w)
