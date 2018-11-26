@@ -47,7 +47,7 @@ def main():
 
     # Training informartion
     model_weiths_path = "checkpoints/"
-    resume_training = True
+    resume_training = False
     if resume_training is False:
         start_epoch = 0
     else:
