@@ -28,32 +28,6 @@ def criterion(logits, labels):
     # return losses.FBeta_ScoreLoss().forward(logits, labels)
     return losses.F1ScoreLoss().forward(logits, labels)
 
-class ToTensorNoScale(object):
-    def __init__(self):
-        pass
-    def __call__(self, pic):
-        if isinstance(pic, np.ndarray):
-            # handle numpy array
-            img = torch.from_numpy(pic.transpose((2, 0, 1)))
-            # backward compatibility
-            if isinstance(img, torch.ByteTensor):
-                return img.float()
-            else:
-                return img
-
-        # handle PIL Image
-        img = torch.from_numpy(np.array(pic, np.uint8, copy=False))
-        
-        nchannel = len(pic.mode)
-        img = img.view(pic.size[1], pic.size[0], nchannel)
-        # put it from HWC to CHW format
-        # yikes, this transpose takes 80% of the loading time/CPU
-        img = img.transpose(0, 1).transpose(0, 2).contiguous()
-        
-        if isinstance(img, torch.ByteTensor):
-            return img.float()
-        return img
-
 def main(model_filename, year, save_dir):
     # Hyperparameters
     threshold = 0.5
@@ -89,7 +63,6 @@ def main(model_filename, year, save_dir):
 def final_evaluation(net, testing_set, testing_transforms, window_size, strides, threshold, save_dir=None):
     fmeasures = []
     pfmeasures = []
-    scaler = MinMaxScaler(feature_range=(0,255))
     net.eval()
     with torch.no_grad():
         for filename_gr in testing_set.data_files:
@@ -154,7 +127,6 @@ def final_evaluation(net, testing_set, testing_transforms, window_size, strides,
             pfmeasures.append(pfmeasure)
 
         return np.mean(fmeasures), np.mean(pfmeasure)
-        
 
 def sliding_window(img, strides, window_size):
     shape = img.shape
@@ -170,12 +142,12 @@ def sliding_window(img, strides, window_size):
             j_f = j_0 + window_size[1]
 
             if i_f > img.shape[0]:
-                i_f = img.shape[0]
+                i_f = img.shape[0] - 1
      
             
             if j_f > img.shape[1]:
-                j_f = img.shape[1] 
-     
+                j_f = img.shape[1] - 1
+
             
             yield (i_0, i_f, j_0, j_f), img[i_0:i_f, j_0:j_f]
 
