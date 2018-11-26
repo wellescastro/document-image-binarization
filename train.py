@@ -52,7 +52,7 @@ def main():
         start_epoch = 0
     else:
         start_epoch = 11
-    model_name = "dibco2016_256x256_whole_aug"
+    model_name = "dibco2016_256x256_no_aug"
     resume_checkpoint = model_weiths_path + "{}-epoch-{}.pth".format(model_name, start_epoch)
 
     use_cuda = torch.cuda.is_available()
@@ -76,7 +76,7 @@ def main():
 
 
     training_set = DIBCODataset(years=[2009, 2010, 2011, 2012, 2013, 2014],
-    transform = training_transforms, target_transform=training_target_transforms, window_size=window_size, stride=strides, include_augmentation=True
+    transform = training_transforms, target_transform=training_target_transforms, window_size=window_size, stride=strides, include_augmentation=False
     )
 
     testing_transforms = transforms.Compose([ 
