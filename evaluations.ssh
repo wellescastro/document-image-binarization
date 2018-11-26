@@ -1,0 +1,5 @@
+python eval.py --model weights/DIBCO2014-WHOLE_AUG/best_model.pth --year 2014
+python eval.py --model weights/DIBCO2016-WHOLE_AUG/best_model.pth --year 2016
+
+python eval.py --model weights/DIBCO2014-WHOLE_AUG/best_model.pth --year 2014 --save_dir "dibco2014_imgs"
+python eval.py --model weights/DIBCO2016-WHOLE_AUG/best_model.pth --year 2016 --save_dir "dibco2016_imgs"
