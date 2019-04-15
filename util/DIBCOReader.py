@@ -10,6 +10,7 @@ from PIL import Image
 import torch
 # from util.sliding_window import sliding_window_view
 from .sliding_window import sliding_window_view
+from sklearn.preprocessing import minmax_scale
 
 class DIBCODataset(Dataset):
 
@@ -118,21 +119,21 @@ class DIBCODataset(Dataset):
         img_gt = self.Y_train[index]
         
         # match PIL shape requirements
-        img_gr = np.expand_dims(img_gr, 2)
-        img_gt = np.expand_dims(img_gt, 2)
+        # img_gr = np.expand_dims(img_gr, 2)
+        # img_gt = np.expand_dims(img_gt, 2)
         
         seed = np.random.randint(2147483647) # make a seed with numpy generator 
         random.seed(seed) # apply this seed to img tranfsorms
         if self.transform is not None:
             img_gr = self.transform(img_gr)
-        else:
-            img_gr = np.transpose(img_gr, axes=(2, 0, 1))
-            img_gr = torch.from_numpy(img_gr).float()
+        # else:
+        #     img_gr = np.transpose(img_gr, axes=(2, 0, 1))
+        #     img_gr = torch.from_numpy(img_gr).float()
         
         random.seed(seed) # apply this seed to target tranfsorms
         if self.target_transform is not None:
             img_gt = self.target_transform(img_gt)
-        
+
         # # sanity check of the transforms
         # a = img_gr.numpy()*255
         # a = np.transpose(a, (1,2,0)).astype(np.uint8)

@@ -26,9 +26,9 @@ import torch.backends.cudnn as cudnn
 
 # np.set_printoptions(threshold=np.nan)
 
-def criterion(logits, labels):
-    return losses.FBeta_ScoreLoss().forward(logits, labels)
-    # return losses.F1ScoreLoss().forward(logits, labels)
+# def criterion(logits, labels):
+#     return losses.FBeta_ScoreLoss().forward(logits, labels)
+#     # return losses.F1ScoreLoss().forward(logits, labels)
 
 def weights_init(m):
     classname = m.__class__.__name__
@@ -39,11 +39,11 @@ def weights_init(m):
 def main():
     # Hyperparameters
     batch_size = 10
-    epochs = 200
+    epochs = 30
     threshold = 0.5
     early_stopping_patience = 20
     window_size = 256,256
-    strides = 96,96
+    strides = 256,256
 
     # Training informartion
     model_weiths_path = "checkpoints/"
@@ -52,56 +52,57 @@ def main():
         start_epoch = 0
     else:
         start_epoch = 11
-    model_name = "dibco2016_256x256_no_aug"
+    model_name = "dibco2019_test"
     resume_checkpoint = model_weiths_path + "{}-epoch-{}.pth".format(model_name, start_epoch)
 
     use_cuda = torch.cuda.is_available()
 
-    # define the model and optimizer
-    net = AutoEncoder(nb_layers=5).cuda()
+    # Model and optimizer definition
+    net = AutoEncoder(nb_layers=5).cuda() # nb_layers not being used, need to refactor AutoEncoder
     net.apply(weights_init)
     print(net)
-    optimizer = optim.Adam(net.parameters(), lr=0.001)
+    # optimizer = optim.Adam(net.parameters(), lr=0.001)
+    optimizer = optim.RMSprop(net.parameters(), lr=0.0003)
+    criterion = losses.FBeta_ScoreLoss()
+
+    # Learning rate scheduler options, currently not being used
     # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=20, verbose=True)
     scheduler = optim.lr_scheduler.StepLR(optimizer, 50, gamma=0.75, last_epoch=-1)
 
-    # define the dataset and data augmentation operations
-    training_transforms = transforms.Compose([
-                transforms.ToTensor()
-                ])
-
-    training_target_transforms = transforms.Compose([
-                transforms.ToTensor()
-                ])
-
-
-    training_set = DIBCODataset(years=[2009, 2010, 2011, 2012, 2013, 2014],
-    transform = training_transforms, target_transform=training_target_transforms, window_size=window_size, stride=strides, include_augmentation=False
+    # Dataset reading
+    training_transforms = transforms.Compose([transforms.ToTensor()])
+    training_target_transforms = transforms.Compose([transforms.ToTensor()])
+    training_set = DIBCODataset(
+        # years=[2009, 2010, 2011, 2012, 2013, 2014, 2016, 2017],
+        years=[2009],
+        transform = training_transforms, 
+        target_transform=training_target_transforms, 
+        window_size=window_size, 
+        stride=strides, 
+        include_augmentation=False
     )
 
-    testing_transforms = transforms.Compose([ 
-        transforms.ToTensor()
-        ])
-
-    testing_target_transforms = transforms.Compose([
-        transforms.ToTensor()
-    ])
-
-    testing_set = DIBCODataset(years=[2016], 
-    transform = testing_transforms, target_transform=testing_target_transforms, window_size=window_size, stride=strides, include_augmentation=False
+    testing_transforms = transforms.Compose([transforms.ToTensor()])
+    testing_target_transforms = transforms.Compose([transforms.ToTensor()])
+    testing_set = DIBCODataset(years=[2009], 
+        transform = testing_transforms, 
+        target_transform=testing_target_transforms, 
+        window_size=window_size, 
+        stride=strides, 
+        include_augmentation=False
     )
 
     train_loader = DataLoader(training_set,
                           batch_size=batch_size,
                           shuffle=True,
-                          num_workers=4,
+                          num_workers=torch.get_num_threads(),
                           pin_memory=True # CUDA only
                          )
     
     test_loader = DataLoader(testing_set,
                           batch_size=batch_size,
                           shuffle=False,
-                          num_workers=4,
+                          num_workers=torch.get_num_threads(),
                           pin_memory=True # CUDA only
                          )
 
@@ -124,9 +125,9 @@ def main():
 
         # perform training
         net.train()
+        t0 = time.time() 
         for ind, (inputs, target) in enumerate(train_loader):
-            
-            t0 = time.time()    
+               
             if use_cuda:
                 inputs = inputs.cuda()
                 target = target.cuda()
@@ -135,7 +136,7 @@ def main():
 
             # forward
             logits = net.forward(inputs)
-            loss = criterion(logits.view(-1, 256*256), target.view(-1, 256*256))
+            loss = criterion.forward(logits, target)
 
             # backward + optimize
             optimizer.zero_grad()
@@ -145,30 +146,32 @@ def main():
             # torch.nn.utils.clip_grad_norm_(net.parameters(), 0.25) # perform gradient clipping
 
             training_metrics['loss'] += loss.item()
-            # training_metrics['mse'] += mse_score(logits.data, target)
-            training_metrics['time'] += (time.time() - t0)
+            # # training_metrics['mse'] += mse_score(logits.data, target)
+            # training_metrics['time'] += (time.time() - t0)
 
-            # # get thresholded prediction and compute the f1-score per patches
-            training_metrics['f1score'] += f_score_no_threshold(target.view(-1, 256*256), logits.view(-1, 256*256), threshold=threshold).item()
-    
-        # get the average training loss
+            # # get thresholded prediction and compute the f1-score per patch
+            # training_metrics['f1score'] += f_score_no_threshold(target.view(-1, 256*256), logits.view(-1, 256*256), threshold=threshold).item()
+        training_metrics['time'] = (time.time() - t0)
+
+        # compute metrics across the batch for training data
         training_metrics['loss'] /= len(train_loader)
         training_metrics['mse'] /= len(train_loader)
         training_metrics['f1score'] /= len(train_loader)
         
-        # scheduler.step(training_metrics['loss']) # enable reduce learning rate on plateau
+        # scheduler.step(training_metrics['loss']) # uncomment to enable learning rate scheduler
 
-        # get the average of the metrics
+        # compute metrics across the batch for testing data
         testing_metrics['loss'] /= len(test_loader)
         testing_metrics['mse'] /= len(test_loader)
         testing_metrics['f1score'] /= len(test_loader)
 
-        test_f1score = final_evaluation(net, testing_set, testing_transforms, window_size, strides, threshold)
+        # test_f1score = final_evaluation(net, testing_set, testing_transforms, window_size, strides, threshold)
+        test_f1score = 0.0
         print('Epoch %d/%d train_loss: %.4f train_f1score: %.4f current patience: %d avg train time: %.2fs test fscore: %.4f' %
                     (epoch + 1, epochs, training_metrics['loss'], training_metrics['f1score'], 
                     (early_stopper.patience - early_stopper.num_bad_epochs), training_metrics['time'], test_f1score))
 
-        
+
         if early_stopper.step(training_metrics['loss']) == True:
             print("Early stopping triggered!")
             break
@@ -186,7 +189,6 @@ def main():
         }, is_best, model_weiths_path, model_name)
 
         torch.cuda.empty_cache()
-    
 
     load_weights(net, "checkpoints/model_best.pth", verbose=True)
 
@@ -215,7 +217,7 @@ def final_evaluation(net, testing_set, testing_transforms, window_size, strides,
 
                 vertical_padding = (window_size[0] - patch_size[0])
                 horizontal_padding = (window_size[1] - patch_size[1])
-                patch_gr = np.pad(patch, ((0, vertical_padding), (0, horizontal_padding)),mode='constant')
+                patch_gr = np.pad(patch, ((0, vertical_padding), (0, horizontal_padding)), mode='constant')
                 patch_gr_with_channel = np.expand_dims(patch_gr, 2) # change to 0 if using final transforms
     
                 inputs = testing_transforms(patch_gr_with_channel).cuda()

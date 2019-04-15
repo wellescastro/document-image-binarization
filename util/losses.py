@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-from metrics import f_score, f_score_no_threshold
+from .metrics import f_score, f_score_no_threshold
 
 class F1ScoreLoss(nn.Module):
     '''
