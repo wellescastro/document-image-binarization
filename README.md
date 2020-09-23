@@ -4,7 +4,7 @@ Esse repositório contém scripts implementados em PyTorch para o treinamento de
 
 # Bases de Dados
 * Bases de dados da DIBCO 2009 até DIBCO 2017 
-(uma das bases de dados é separada para validação e o restante utilizada para o treinamento do modelo)
+(uma das bases de dados é separada para validação e o restante são usadas para o treinamento do modelo)
 
 # Requerimentos
 * Python (versão utilizada 2.7)
@@ -18,10 +18,9 @@ O treinamento do modelo pode ser realizado com o seguinte comando:
 python train.py
 ```
 
-
 # Teste
 
-A avaliação do modelo em uma base de dados distinta que não foi usada para treinamento pode ser feita com o seguinte comando:
+A avaliação do modelo com uma base de dados de validação pode ser feita com o seguinte comando:
 ``` 
 python eval.py --model weights/DIBCO2016-WHOLE_AUG/best_model.pth --year 2016
 ``` 
